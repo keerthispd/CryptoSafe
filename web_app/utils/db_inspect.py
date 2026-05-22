@@ -1,7 +1,7 @@
 import os
 import sqlite3
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'cryptosafe.db')
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'cryptosafe.db')
 print('Using DB:', DB_PATH)
 if not os.path.exists(DB_PATH):
     print('Database file not found.')

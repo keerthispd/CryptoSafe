@@ -20,15 +20,23 @@ This demo now uses Flask + SQLite for registration.
 
 ### Run Locally
 1. Create and activate a virtual environment (recommended).
-2. Install dependencies:
+2. From the repository root, change into the web app folder:
+	`cd web_app`
+3. Install dependencies:
 	`pip install -r requirements.txt`
-3. Start the server:
+4. Start the server:
 	`python app.py`
-4. Open:
+5. Open:
 	`http://127.0.0.1:5000/registration.html`
 	`http://127.0.0.1:5000/login.html`
 	`http://127.0.0.1:5000/forgot-password.html`
 	`http://127.0.0.1:5000/biometric.html` (phase 2 page, reached automatically after password login)
+
+### Project Layout
+- `web_app/app.py` is the Flask entry point.
+- `web_app/templates/` contains the HTML pages served by Flask.
+- `web_app/utils/` contains the database inspection and wipe scripts.
+- `web_app/cryptosafe.db` is the SQLite database file.
 
 ### Biometric Notes
 - A browser/device with WebAuthn passkey support is required for registration and login.
