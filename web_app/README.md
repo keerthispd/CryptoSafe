@@ -25,7 +25,7 @@ This demo now uses Flask + SQLite for registration.
 3. Install dependencies:
 	`pip install -r requirements.txt`
 4. Start the server:
-	`python app.py`
+	`python run.py`
 5. Open:
 	`http://127.0.0.1:5000/registration.html`
 	`http://127.0.0.1:5000/login.html`
@@ -33,6 +33,7 @@ This demo now uses Flask + SQLite for registration.
 	`http://127.0.0.1:5000/biometric.html` (phase 2 page, reached automatically after password login)
 
 ### Project Layout
+- `run.py` is the root launcher you run from the repository root.
 - `web_app/app.py` is the Flask entry point.
 - `web_app/templates/` contains the HTML pages served by Flask.
 - `web_app/utils/` contains the database inspection and wipe scripts.
