@@ -493,12 +493,12 @@
 
 		function updateMethodUI() {
 			const method = document.querySelector("input[name='auth_method']:checked").value;
+			createBtn.disabled = false;
+			createBtn.textContent = "Create Account";
 			if (method === "passcode") {
 				passcodeFields.style.display = "block";
-				createBtn.textContent = "Create Account";
 			} else {
 				passcodeFields.style.display = "none";
-				createBtn.textContent = "Create Account";
 			}
 		}
 

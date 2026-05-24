@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New File</title>
+  <style>
+    :root {
+      --bg: #06101b;
+      --panel: rgba(9, 18, 30, 0.86);
+      --panel-border: rgba(110, 231, 183, 0.12);
+      --ink: #eff6ff;
+      --muted: #9fb0c2;
+      --accent: #6ee7b7;
+      --accent-2: #38bdf8;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.14), transparent 28%),
+        radial-gradient(circle at 85% 10%, rgba(110, 231, 183, 0.14), transparent 22%),
+        linear-gradient(160deg, #020814, #081627 50%, #050d18);
+      padding: 24px;
+    }
+
+    .topbar {
+      width: min(880px, 100%);
+      margin: 0 auto 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 18px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(166, 180, 194, 0.12);
+    }
+
+    .logout {
+      color: #03111a;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      text-decoration: none;
+      font-weight: 700;
+      padding: 10px 14px;
+      border-radius: 12px;
+    }
+
+    .panel {
+      width: min(880px, 100%);
+      margin: 0 auto;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 24px;
+      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.32);
+      backdrop-filter: blur(14px);
+      padding: 24px;
+    }
+
+    h1 {
+      margin: 0 0 18px;
+      font-size: 1.4rem;
+    }
+
+    .status {
+      margin-bottom: 14px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 0.92rem;
+      display: none;
+    }
+
+    .status.show { display: block; }
+    .status.error { background: rgba(244, 63, 94, 0.16); color: #fecdd3; }
+
+    .field { margin-bottom: 14px; }
+
+    label {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      border: 1px solid rgba(166, 180, 194, 0.25);
+      border-radius: 12px;
+      padding: 11px 12px;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--ink);
+      font: inherit;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 180px;
+      resize: vertical;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: #02131f;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    }
+
+    button.alt {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--ink);
+      border: 1px solid rgba(166, 180, 194, 0.2);
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 18px; }
+      .topbar, .panel { width: 100%; }
+      .topbar { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <strong>New File</strong>
+    <a class="logout" href="/dashboard.html">Back</a>
+  </header>
+
+  <main class="panel">
+    <div id="status" class="status"></div>
+    <form id="createForm">
+      <div class="field">
+        <label for="title">Title</label>
+        <input id="title" name="title" type="text" maxlength="120" required />
+      </div>
+      <div class="field">
+        <label for="description">Description</label>
+        <input id="description" name="description" type="text" maxlength="180" />
+      </div>
+      <div class="field">
+        <label for="content">Content</label>
+        <textarea id="content" name="content"></textarea>
+      </div>
+      <div class="field">
+        <label for="upload_file">Attachments</label>
+        <input id="upload_file" name="upload_file" type="file" multiple accept="image/*,audio/*,.pdf,.doc,.docx,.txt,.rtf,.csv,.xls,.xlsx,.ppt,.pptx,.mp3,.wav,.m4a,.ogg,.aac,.flac" />
+      </div>
+      <div class="btn-row">
+        <button type="submit">Create</button>
+        <button type="button" class="alt" id="clearBtn">Clear</button>
+      </div>
+    </form>
+  </main>
+
+  <script>
+    const createForm = document.getElementById("createForm");
+    const status = document.getElementById("status");
+    const clearBtn = document.getElementById("clearBtn");
+
+    function showStatus(message) {
+      status.textContent = message;
+      status.className = "status show error";
+    }
+
+    async function apiRequest(url, options = {}) {
+      const isFormData = options.body instanceof FormData;
+      const headers = { ...(options.headers || {}) };
+      if (!isFormData) {
+        headers["Content-Type"] = headers["Content-Type"] || "application/json";
+      }
+      const response = await fetch(url, { ...options, headers });
+      const text = await response.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch (_) { data = {}; }
+      if (!response.ok) {
+        throw new Error(data.error || data.message || `Request failed (${response.status}).`);
+      }
+      return data;
+    }
+
+    createForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        const formData = new FormData();
+        formData.append("title", document.getElementById("title").value.trim());
+        formData.append("description", document.getElementById("description").value.trim());
+        formData.append("content", document.getElementById("content").value);
+        Array.from(document.getElementById("upload_file").files || []).forEach((file) => {
+          formData.append("upload_file", file);
+        });
+        await apiRequest("/api/files", { method: "POST", body: formData });
+        window.location.href = "/dashboard.html";
+      } catch (error) {
+        showStatus(error.message);
+      }
+    });
+
+    clearBtn.addEventListener("click", () => {
+      createForm.reset();
+      status.className = "status";
+      status.textContent = "";
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>File</title>
+  <style>
+    :root {
+      --bg: #06101b;
+      --panel: rgba(9, 18, 30, 0.86);
+      --panel-border: rgba(110, 231, 183, 0.12);
+      --ink: #eff6ff;
+      --muted: #9fb0c2;
+      --accent: #6ee7b7;
+      --accent-2: #38bdf8;
+      --danger: #f43f5e;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.14), transparent 28%),
+        radial-gradient(circle at 85% 10%, rgba(110, 231, 183, 0.14), transparent 22%),
+        linear-gradient(160deg, #020814, #081627 50%, #050d18);
+      padding: 24px;
+    }
+
+    .topbar,
+    .panel {
+      width: min(1240px, 100%);
+      margin: 0 auto;
+    }
+
+    .topbar {
+      margin-bottom: 18px;
+      padding: 14px 18px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(166, 180, 194, 0.12);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #fileTitle {
+      max-width: 64ch;
+      display: inline-block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+
+    .logout {
+      color: #03111a;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      text-decoration: none;
+      font-weight: 700;
+      padding: 10px 14px;
+      border-radius: 12px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 24px;
+      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.32);
+      backdrop-filter: blur(14px);
+      padding: 24px;
+      margin-bottom: 18px;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .panel-subtitle {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    h1, h2 {
+      margin: 0 0 16px;
+    }
+
+    .status {
+      margin-bottom: 14px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 0.92rem;
+      display: none;
+    }
+
+    .status.show { display: block; }
+    .status.error { background: rgba(244, 63, 94, 0.16); color: #fecdd3; }
+    .status.ok { background: rgba(52, 211, 153, 0.15); color: #a7f3d0; }
+
+    .field { margin-bottom: 14px; }
+
+    label {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      border: 1px solid rgba(166, 180, 194, 0.25);
+      border-radius: 12px;
+      padding: 11px 12px;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--ink);
+      font: inherit;
+      outline: none;
+    }
+
+    input:focus-visible,
+    textarea:focus-visible,
+    button:focus-visible,
+    a:focus-visible {
+      outline: 2px solid rgba(110, 231, 183, 0.72);
+      outline-offset: 2px;
+    }
+
+    /* Read-only cursor styling */
+    .readonly,
+    input[readonly],
+    textarea[readonly] { cursor: text !important; }
+
+    .readonly:hover,
+    input[readonly]:hover,
+    textarea[readonly]:hover { cursor: text !important; }
+
+    textarea {
+      min-height: 160px;
+      resize: vertical;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn-row.space-between {
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .toolbar-shell {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(166, 180, 194, 0.08);
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: #02131f;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    }
+
+    button.alt {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--ink);
+      border: 1px solid rgba(166, 180, 194, 0.2);
+    }
+
+    button.alt.active {
+      background: linear-gradient(135deg, rgba(110, 231, 183, 0.96), rgba(56, 189, 248, 0.92));
+      color: #02131f;
+      border-color: rgba(110, 231, 183, 0.4);
+      box-shadow: 0 10px 24px rgba(56, 189, 248, 0.18);
+    }
+
+    button.compact {
+      padding: 8px 12px;
+      border-radius: 9px;
+      font-size: 0.9rem;
+    }
+
+    button.warn {
+      background: linear-gradient(135deg, #fb7185, #f43f5e);
+      color: white;
+    }
+
+    button:disabled,
+    input:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+
+    .detail.editing .grid {
+      grid-template-columns: 1.2fr 0.8fr;
+    }
+
+    .attachment-list {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    }
+
+    .edit-controls {
+      margin-top: 8px;
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(166, 180, 194, 0.12);
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .edit-controls.hidden { display: none; }
+
+    .attachment-item {
+      border: 1px solid rgba(166, 180, 194, 0.14);
+      border-radius: 16px;
+      padding: 36px 12px 12px;
+      background: rgba(255, 255, 255, 0.04);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      min-height: 190px;
+      transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .attachment-item:hover {
+      transform: translateY(-1px);
+      border-color: rgba(110, 231, 183, 0.24);
+      background: rgba(255, 255, 255, 0.055);
+    }
+
+    .attachment-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+      padding-right: 44px;
+    }
+
+    .attachment-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.16);
+      color: #c7eefe;
+      max-width: calc(100% - 66px);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .attachment-badge.badge--accent {
+      background: rgba(110, 231, 183, 0.12);
+      border-color: rgba(110, 231, 183, 0.18);
+      color: #bff7df;
+    }
+
+    .attachment-badge.badge--sky {
+      background: rgba(56, 189, 248, 0.12);
+      border-color: rgba(56, 189, 248, 0.18);
+      color: #c7eefe;
+    }
+
+    .attachment-badge.badge--rose {
+      background: rgba(244, 63, 94, 0.12);
+      border-color: rgba(244, 63, 94, 0.18);
+      color: #ffd1da;
+    }
+
+    .attachment-badge.badge--muted {
+      background: rgba(159, 176, 194, 0.12);
+      border-color: rgba(159, 176, 194, 0.18);
+      color: #d7e0ea;
+    }
+
+    .attachment-thumb {
+      width: 56px;
+      height: 56px;
+      object-fit: cover;
+      border-radius: 10px;
+      flex: 0 0 auto;
+      border: 1px solid rgba(166,180,194,0.08);
+      background: rgba(255,255,255,0.02);
+    }
+
+    .attachment-checkbox {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+
+    .attachment-checkbox-input {
+      position: absolute;
+      opacity: 0;
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .attachment-checkbox-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 6px;
+      border: 1px solid rgba(166, 180, 194, 0.2);
+      display: inline-block;
+      text-align: center;
+      line-height: 18px;
+      font-size: 12px;
+      color: transparent;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .attachment-checkbox-input:checked + .attachment-checkbox-icon {
+      background: linear-gradient(135deg, #fb7185, #f43f5e);
+      border-color: rgba(244,63,94,0.6);
+      color: transparent;
+    }
+
+    .attachment-checkbox-input:checked + .attachment-checkbox-icon::before {
+      content: '';
+      display: block;
+      width: 12px;
+      height: 12px;
+      margin: 0 auto;
+      background-repeat: no-repeat;
+      background-size: contain;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%23fff' d='M3 6h18v2H3V6zm2 3h14l-1 11H6L5 9zm5-7h4l1 2H7l1-2z'/></svg>");
+    }
+
+    .attachment-top strong {
+      flex: 1;
+      word-break: break-word;
+    }
+
+    .attachment-top small {
+      color: var(--muted);
+      display: block;
+      width: 100%;
+    }
+
+    .attachment-title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .attachment-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 26px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.1);
+      color: #c7eefe;
+      border: 1px solid rgba(56, 189, 248, 0.14);
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+
+    .attachment-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: auto;
+      align-items: center;
+    }
+
+    .attachment-actions button.active-preview {
+      background: linear-gradient(135deg, rgba(110, 231, 183, 0.92), rgba(56, 189, 248, 0.88));
+      color: #02131f;
+      border: 1px solid rgba(110, 231, 183, 0.36);
+      box-shadow: 0 10px 24px rgba(56, 189, 248, 0.16);
+    }
+
+    .attachment-actions button {
+      padding: 8px 12px;
+      border-radius: 9px;
+    }
+
+    .attachment-actions .danger-mini {
+      background: rgba(244, 63, 94, 0.14);
+      color: #fecdd3;
+      border: 1px solid rgba(244, 63, 94, 0.18);
+    }
+
+    .toggle-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 8px;
+    }
+
+    .toggle-row label {
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 900px) {
+      .topbar { flex-direction: column; align-items: flex-start; }
+      .panel-header { flex-direction: column; }
+      .attachment-list { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+    }
+
+    @media (max-width: 768px) {
+      body { padding: 18px; }
+      .topbar,
+      .panel { padding: 18px; }
+      .detail.editing .grid { grid-template-columns: 1.1fr 0.9fr; gap: 14px; }
+      .attachment-list { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+      .attachment-item { min-height: 0; }
+      .attachment-badge {
+        min-width: 26px;
+        height: 18px;
+        padding: 0 5px;
+        font-size: 0.48rem;
+      }
+      .toolbar-shell { padding: 8px 10px; }
+      .edit-controls { padding: 12px; }
+    }
+
+    @media (min-width: 769px) and (max-width: 1024px) and (orientation: landscape) {
+      body { padding: 20px; }
+      .topbar,
+      .panel { padding: 20px; }
+      .detail.editing .grid { grid-template-columns: 1.08fr 0.92fr; gap: 16px; }
+      .attachment-list { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+      .attachment-item { min-height: 0; padding-top: 34px; }
+      .attachment-badge {
+        min-width: 30px;
+        height: 18px;
+        padding: 0 5px;
+        font-size: 0.5rem;
+      }
+      .toolbar-shell { padding: 9px 11px; }
+      .edit-controls { padding: 14px; }
+      .modal { max-width: 540px; }
+      #fileTitle {
+        max-width: 52ch;
+        white-space: nowrap;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 14px; }
+      .topbar,
+      .panel { padding: 14px; }
+      .topbar {
+        gap: 12px;
+        flex-direction: row;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .topbar > div:last-child {
+        width: auto;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        gap: 12px;
+      }
+      .topbar .logout,
+      .topbar button {
+        width: auto;
+        text-align: center;
+        padding: 8px 10px;
+        border-radius: 10px;
+      }
+      .topbar .logout { white-space: nowrap; }
+      .panel-header h1 { font-size: 1.1rem; }
+      .panel-subtitle { font-size: 0.84rem; }
+      .toolbar-shell {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .toolbar-shell button { width: 100%; }
+      .attachment-item {
+        min-height: 0;
+        padding: 32px 10px 10px;
+      }
+      .attachment-top {
+        padding-right: 0;
+        margin-bottom: 6px;
+      }
+      .attachment-badge {
+        top: 10px;
+        left: 10px;
+        min-width: 28px;
+        height: 18px;
+        padding: 0 5px;
+        font-size: 0.48rem;
+      }
+      .attachment-thumb {
+        width: 46px;
+        height: 46px;
+      }
+      .attachment-actions {
+        width: 100%;
+      }
+      .attachment-actions button {
+        flex: 1 1 0;
+      }
+      .edit-controls {
+        padding: 12px;
+      }
+      .modal {
+        max-width: calc(100vw - 28px);
+        padding: 14px;
+      }
+      #fileTitle {
+        max-width: 100%;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+      }
+    }
+
+    /* Modal styles */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(2,6,23,0.6);
+      z-index: 1200;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+      animation: fadeIn 0.18s ease-out;
+    }
+
+    .modal {
+      width: 100%;
+      max-width: 520px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      padding: 18px;
+      border-radius: 12px;
+      box-shadow: 0 20px 55px rgba(0,0,0,0.32);
+      animation: scaleIn 0.18s ease-out;
+    }
+
+    .modal h3 { margin: 0 0 12px; }
+    .modal img, .modal embed, .modal iframe, .modal audio {
+      max-width: 100%;
+      height: auto;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes scaleIn {
+      from { opacity: 0; transform: translateY(8px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <strong id="fileTitle">File</strong>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button type="button" class="alt" id="updateBtn">Edit</button>
+      <button type="button" class="warn" id="deleteFileBtn">Delete</button>
+      <a class="logout" href="/dashboard.html">Back</a>
+    </div>
+  </header>
+
+  <main>
+    <section id="gate" class="panel">
+      <div class="panel-header">
+        <div>
+          <h1>Open</h1>
+          <p class="panel-subtitle">Enter the password once to view the file. Editing stays locked until you choose Edit.</p>
+        </div>
+      </div>
+      <div id="gateStatus" class="status"></div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" type="password" />
+      </div>
+      <div class="btn-row">
+        <button type="button" id="openBtn">Open</button>
+      </div>
+    </section>
+
+    <section id="detail" class="panel hidden">
+      <div class="panel-header">
+        <div>
+          <h1>File details</h1>
+          <p class="panel-subtitle">Review content and attachments. Use Edit to unlock changes when needed.</p>
+        </div>
+      </div>
+      <div id="detailStatus" class="status"></div>
+      <div class="grid">
+        <div>
+          <div class="field">
+            <label for="title">Title</label>
+            <input id="title" type="text" maxlength="120" />
+          </div>
+          <div class="field">
+            <label for="description">Description</label>
+            <input id="description" type="text" maxlength="180" />
+          </div>
+          <div class="field">
+            <label for="content">Content</label>
+            <textarea id="content"></textarea>
+          </div>
+          <div class="field">
+            <label class="attachment-title-row">Attachments <span id="attachmentCount" class="attachment-count">0</span></label>
+            <div class="toolbar-shell">
+              <div class="toolbar-actions">
+                <button type="button" class="alt compact" id="selectAllBtn">Select all</button>
+              </div>
+              <button type="button" class="warn compact" id="deleteSelectedBtn" style="display:none;">Delete selected</button>
+            </div>
+            <div id="attachmentList" class="attachment-list"></div>
+          </div>
+        </div>
+        <div>
+          <div id="editControls" class="edit-controls hidden">
+            <div class="field">
+              <label for="uploadFile">Upload</label>
+              <input id="uploadFile" type="file" multiple accept="image/*,audio/*,.pdf,.doc,.docx,.txt,.rtf,.csv,.xls,.xlsx,.ppt,.pptx,.mp3,.wav,.m4a,.ogg,.aac,.flac" />
+            </div>
+            <div class="field">
+              <label for="passwordConfirm">Password</label>
+              <input id="passwordConfirm" type="password" />
+            </div>
+            <div class="btn-row">
+              <button type="button" id="saveBtn">Save</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- Password modal for enabling edits -->
+    <div id="pwModal" class="hidden modal-backdrop" aria-hidden="true">
+      <div class="modal">
+        <h3>Enter password to edit</h3>
+        <div class="field">
+          <label for="modalPassword">Password</label>
+          <input id="modalPassword" type="password" />
+        </div>
+        <div class="btn-row">
+          <button type="button" id="modalSubmit">OK</button>
+          <button type="button" id="modalCancel" class="alt">Cancel</button>
+        </div>
+        <div id="modalStatus" class="status"></div>
+      </div>
+    </div>
+
+    <!-- Delete file confirmation modal -->
+    <div id="deleteModal" class="hidden modal-backdrop" aria-hidden="true">
+      <div class="modal">
+        <h3>Are you sure you want to delete this file?</h3>
+        <p class="panel-subtitle" style="margin-bottom:12px;">Enter your password to confirm this action.</p>
+        <div class="field">
+          <label for="deletePassword">Password</label>
+          <input id="deletePassword" type="password" />
+        </div>
+        <div class="btn-row">
+          <button type="button" id="deleteConfirmBtn" class="warn">Delete file</button>
+          <button type="button" id="deleteCancelBtn" class="alt">Cancel</button>
+        </div>
+        <div id="deleteStatus" class="status"></div>
+      </div>
+    </div>
+  </main>
+  <!-- Preview modal for attachments -->
+  <div id="previewModal" class="hidden modal-backdrop" aria-hidden="true">
+    <div class="modal" id="previewBox">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <h3 id="previewTitle">Preview</h3>
+        <button type="button" id="previewClose" class="alt">Close</button>
+      </div>
+      <div id="previewBody" style="min-height:120px;"></div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const fileId = params.get("id") || "";
+
+    const gate = document.getElementById("gate");
+    const gateStatus = document.getElementById("gateStatus");
+    const detail = document.getElementById("detail");
+    const detailStatus = document.getElementById("detailStatus");
+    const openBtn = document.getElementById("openBtn");
+    const password = document.getElementById("password");
+    const passwordConfirm = document.getElementById("passwordConfirm");
+    const title = document.getElementById("title");
+    const description = document.getElementById("description");
+    const content = document.getElementById("content");
+    const fileTitle = document.getElementById("fileTitle");
+    const attachmentList = document.getElementById("attachmentList");
+    const uploadFile = document.getElementById("uploadFile");
+    const saveBtn = document.getElementById("saveBtn");
+    const updateBtn = document.getElementById("updateBtn");
+    const deleteFileBtn = document.getElementById("deleteFileBtn");
+    const deleteSelectedBtn = document.getElementById("deleteSelectedBtn");
+    const selectAllBtn = document.getElementById("selectAllBtn");
+    const attachmentCount = document.getElementById("attachmentCount");
+    const editControls = document.getElementById('editControls');
+    const deleteModal = document.getElementById('deleteModal');
+    const deletePassword = document.getElementById('deletePassword');
+    const deleteConfirmBtn = document.getElementById('deleteConfirmBtn');
+    const deleteCancelBtn = document.getElementById('deleteCancelBtn');
+    const deleteStatus = document.getElementById('deleteStatus');
+
+    let currentPassword = "";
+    let currentAttachments = [];
+    const selectedDeleteIds = new Set();
+    let editingEnabled = false;
+
+    function show(node, message, kind = "error") {
+      node.textContent = message;
+      node.className = `status show ${kind}`;
+    }
+
+    function clear(node) {
+      node.textContent = "";
+      node.className = "status";
+    }
+
+    async function apiRequest(url, options = {}) {
+      const isFormData = options.body instanceof FormData;
+      const headers = { ...(options.headers || {}) };
+      if (!isFormData) {
+        headers["Content-Type"] = headers["Content-Type"] || "application/json";
+      }
+      const response = await fetch(url, { ...options, headers });
+      const text = await response.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch (_) { data = {}; }
+      if (!response.ok) {
+        throw new Error(data.error || data.message || `Request failed (${response.status}).`);
+      }
+      return data;
+    }
+
+    function formatBytes(bytes) {
+      const value = Number(bytes) || 0;
+      if (value < 1024) return `${value} B`;
+      const units = ["KB", "MB", "GB"];
+      let size = value;
+      let idx = -1;
+      while (size >= 1024 && idx < units.length - 1) {
+        size /= 1024;
+        idx += 1;
+      }
+      return `${size.toFixed(size >= 10 || idx === 0 ? 1 : 2)} ${units[idx]}`;
+    }
+
+    function updateDeleteSelectedButton() {
+      deleteSelectedBtn.style.display = selectedDeleteIds.size ? "inline-block" : "none";
+      deleteSelectedBtn.textContent = selectedDeleteIds.size ? `Delete selected (${selectedDeleteIds.size})` : "Delete selected";
+      const allSelected = currentAttachments.length > 0 && selectedDeleteIds.size === currentAttachments.length;
+      selectAllBtn.textContent = allSelected ? "Clear all" : "Select all";
+      selectAllBtn.classList.toggle("active", allSelected);
+    }
+
+    function renderAttachments() {
+      // clear thumbnails and preview URLs
+      if (window._thumbnailUrls && Array.isArray(window._thumbnailUrls)) {
+        window._thumbnailUrls.forEach((u) => { try { URL.revokeObjectURL(u); } catch(e){} });
+      }
+      window._thumbnailUrls = [];
+      attachmentList.innerHTML = "";
+      selectedDeleteIds.clear();
+      updateDeleteSelectedButton();
+      attachmentCount.textContent = `${currentAttachments.length}`;
+
+      currentAttachments.forEach((attachment, index) => {
+        const row = document.createElement("div");
+        row.className = "attachment-item";
+
+        const top = document.createElement("div");
+        top.className = "attachment-top";
+
+        const cbLabel = document.createElement("label");
+        cbLabel.className = "attachment-checkbox";
+
+        const selectDelete = document.createElement("input");
+        selectDelete.type = "checkbox";
+        selectDelete.className = "attachment-checkbox-input";
+        selectDelete.dataset.attachmentId = String(attachment.attachment_id || "");
+        selectDelete.addEventListener("change", () => {
+          const key = String(attachment.attachment_id || "");
+          if (selectDelete.checked) selectedDeleteIds.add(key); else selectedDeleteIds.delete(key);
+          updateDeleteSelectedButton();
+        });
+
+        const cbIcon = document.createElement("span");
+        cbIcon.className = "attachment-checkbox-icon";
+
+        const name = document.createElement("strong");
+        name.textContent = attachment.uploaded_file_name || `Attachment ${index + 1}`;
+
+        const badge = document.createElement('span');
+        badge.className = 'attachment-badge';
+        const fileName = String(attachment.uploaded_file_name || '').toLowerCase();
+        const match = fileName.match(/\.([a-z0-9]+)$/);
+        const ext = match ? match[1] : '';
+        const themeClass = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(ext)
+          ? 'badge--accent'
+          : ['pdf'].includes(ext)
+            ? 'badge--rose'
+            : ['mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac'].includes(ext)
+              ? 'badge--sky'
+              : ['txt', 'rtf', 'csv', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)
+                ? 'badge--muted'
+                : 'badge--sky';
+        badge.classList.add(themeClass);
+        badge.textContent = ext ? ext.toUpperCase().slice(0, 6) : 'FILE';
+
+        // inline thumbnail for image file names (small heuristic by extension)
+        const fname = (attachment.uploaded_file_name || '').toLowerCase();
+        const isImage = /\.(png|jpe?g|gif|webp|bmp|svg)$/.test(fname);
+        if (isImage) {
+          const thumb = document.createElement('img');
+          thumb.className = 'attachment-thumb';
+          thumb.alt = name.textContent;
+          // optimistic placeholder while fetching
+          thumb.src = '';
+          top.insertBefore(thumb, top.firstChild);
+          // fetch small preview blob and set src
+          (async () => {
+            try {
+              const resp = await fetch(`/api/files/${fileId}/download`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: currentPassword, attachment_id: attachment.attachment_id }),
+              });
+              if (!resp.ok) throw new Error('Thumbnail fetch failed');
+              const b = await resp.blob();
+              const url = URL.createObjectURL(b);
+              thumb.src = url;
+              window._thumbnailUrls.push(url);
+            } catch (err) {
+              thumb.remove();
+            }
+          })();
+        }
+
+        const meta = document.createElement("small");
+        meta.textContent = `${formatBytes(attachment.uploaded_file_size || 0)}`;
+
+        top.append(name, badge);
+        cbLabel.append(selectDelete, cbIcon);
+        row.append(cbLabel);
+        row.append(top, meta);
+
+        const actions = document.createElement("div");
+        actions.className = "attachment-actions";
+        // Preview button
+        const previewBtn = document.createElement("button");
+        previewBtn.type = "button";
+        previewBtn.textContent = "Preview";
+        previewBtn.addEventListener('click', async () => {
+          clear(detailStatus);
+          attachmentList.querySelectorAll('button.active-preview').forEach((btn) => btn.classList.remove('active-preview'));
+          previewBtn.classList.add('active-preview');
+          try {
+            const response = await fetch(`/api/files/${fileId}/download`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ password: currentPassword, attachment_id: attachment.attachment_id }),
+            });
+            if (!response.ok) throw new Error('Preview failed');
+            const blob = await response.blob();
+            showPreview(blob, attachment.uploaded_file_name || 'Preview');
+          } catch (err) {
+            previewBtn.classList.remove('active-preview');
+            show(detailStatus, err.message || String(err));
+          }
+        });
+
+        // Download button
+        const downloadBtn = document.createElement("button");
+        downloadBtn.type = "button";
+        downloadBtn.textContent = "Download";
+        downloadBtn.className = 'compact';
+        downloadBtn.onclick = async () => {
+          const response = await fetch(`/api/files/${fileId}/download`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password: currentPassword, attachment_id: attachment.attachment_id }),
+          });
+          if (!response.ok) return;
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = attachment.uploaded_file_name || "file";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        };
+
+        previewBtn.className = 'compact';
+        actions.append(previewBtn, downloadBtn);
+        row.append(actions);
+        attachmentList.appendChild(row);
+      });
+    }
+
+    // Preview modal handling
+    const previewModal = document.getElementById('previewModal');
+    const previewBody = document.getElementById('previewBody');
+    const previewTitle = document.getElementById('previewTitle');
+    const previewClose = document.getElementById('previewClose');
+    let _previewUrl = null;
+
+    function clearPreview() {
+      if (_previewUrl) {
+        URL.revokeObjectURL(_previewUrl);
+        _previewUrl = null;
+      }
+      previewBody.innerHTML = '';
+    }
+
+    function showPreview(blob, name) {
+      clearPreview();
+      const mime = blob.type || '';
+      _previewUrl = URL.createObjectURL(blob);
+      previewTitle.textContent = name || 'Preview';
+      if (mime.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.src = _previewUrl;
+        previewBody.appendChild(img);
+      } else if (mime.startsWith('audio/')) {
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        audio.src = _previewUrl;
+        previewBody.appendChild(audio);
+      } else if (mime === 'application/pdf') {
+        const embed = document.createElement('embed');
+        embed.src = _previewUrl;
+        embed.type = 'application/pdf';
+        embed.width = '100%';
+        embed.height = '600px';
+        previewBody.appendChild(embed);
+      } else if (mime.startsWith('text/')) {
+        blob.text().then((txt) => {
+          const pre = document.createElement('pre');
+          pre.textContent = txt;
+          pre.style.whiteSpace = 'pre-wrap';
+          pre.style.wordBreak = 'break-word';
+          previewBody.appendChild(pre);
+        });
+      } else {
+        // Fallback: provide link to open
+        const note = document.createElement('p');
+        note.textContent = 'This file type cannot be previewed inline. You can open or download it instead.';
+        note.style.color = 'var(--muted)';
+        note.style.marginTop = '0';
+        previewBody.appendChild(note);
+        const link = document.createElement('a');
+        link.href = _previewUrl;
+        link.textContent = 'Open file';
+        link.target = '_blank';
+        previewBody.appendChild(link);
+      }
+      previewModal.classList.remove('hidden');
+      previewModal.setAttribute('aria-hidden', 'false');
+    }
+
+    previewClose.addEventListener('click', () => {
+      previewModal.classList.add('hidden');
+      previewModal.setAttribute('aria-hidden', 'true');
+      clearPreview();
+    });
+
+    async function openFile() {
+      if (!fileId) {
+        show(gateStatus, "");
+        return;
+      }
+      const pw = password.value.trim();
+      if (!pw) {
+        show(gateStatus, "", "error");
+        return;
+      }
+
+      try {
+        const data = await apiRequest(`/api/files/${fileId}/display`, {
+          method: "POST",
+          body: JSON.stringify({ password: pw }),
+        });
+        currentPassword = pw;
+        title.value = data.title || "";
+        description.value = data.description || "";
+        content.value = data.content || "";
+        fileTitle.textContent = data.title || "File";
+        fileTitle.title = data.title || "";
+        currentAttachments = data.attachments || [];
+        renderAttachments();
+        gate.classList.add("hidden");
+        detail.classList.remove("hidden");
+        // start in read-only mode
+        setReadOnly(true);
+        clear(gateStatus);
+        clear(detailStatus);
+      } catch (error) {
+        show(gateStatus, error.message);
+      }
+    }
+
+    openBtn.addEventListener("click", openFile);
+    password.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        openFile();
+      }
+    });
+
+    saveBtn.addEventListener("click", async () => {
+      clear(detailStatus);
+      if (!editingEnabled) return show(detailStatus, "Enable editing first using Edit button");
+      const uploadFiles = Array.from(uploadFile.files || []);
+      try {
+        const formData = new FormData();
+        formData.append("title", title.value.trim());
+        formData.append("description", description.value.trim());
+        formData.append("content", content.value);
+        formData.append("password", currentPassword);
+        uploadFiles.forEach((file) => formData.append("upload_file", file));
+        await apiRequest(`/api/files/${fileId}/update`, {
+          method: "POST",
+          body: formData,
+        });
+        uploadFile.value = "";
+        const refreshed = await apiRequest(`/api/files/${fileId}/display`, {
+          method: "POST",
+          body: JSON.stringify({ password: currentPassword }),
+        });
+        currentAttachments = refreshed.attachments || [];
+        renderAttachments();
+        fileTitle.textContent = title.value || "File";
+        fileTitle.title = title.value || "";
+        show(detailStatus, "", "ok");
+      } catch (error) {
+        show(detailStatus, error.message);
+      }
+    });
+
+    function setReadOnly(isReadOnly) {
+      editingEnabled = !isReadOnly;
+      detail.classList.toggle('editing', !isReadOnly);
+      title.readOnly = isReadOnly;
+      description.readOnly = isReadOnly;
+      content.readOnly = isReadOnly;
+      uploadFile.disabled = isReadOnly;
+      passwordConfirm.disabled = isReadOnly;
+      saveBtn.disabled = isReadOnly;
+      if (editControls) editControls.classList.toggle('hidden', isReadOnly);
+      // visually indicate disabled state
+      [title, description, content, uploadFile, passwordConfirm].forEach((el) => {
+        if (isReadOnly) el.classList.add('readonly'); else el.classList.remove('readonly');
+      });
+      updateBtn.textContent = isReadOnly ? 'Edit' : 'Lock';
+    }
+    // password modal elements
+    const pwModal = document.getElementById('pwModal');
+    const modalPassword = document.getElementById('modalPassword');
+    const modalSubmit = document.getElementById('modalSubmit');
+    const modalCancel = document.getElementById('modalCancel');
+    const modalStatus = document.getElementById('modalStatus');
+
+    function showPasswordModal() {
+      modalStatus.textContent = '';
+      modalStatus.className = 'status';
+      pwModal.classList.remove('hidden');
+      pwModal.setAttribute('aria-hidden', 'false');
+      setTimeout(() => modalPassword.focus(), 50);
+    }
+
+    function hidePasswordModal() {
+      pwModal.classList.add('hidden');
+      pwModal.setAttribute('aria-hidden', 'true');
+    }
+
+    function showDeleteModal() {
+      deleteStatus.textContent = '';
+      deleteStatus.className = 'status';
+      deletePassword.value = '';
+      deleteModal.classList.remove('hidden');
+      deleteModal.setAttribute('aria-hidden', 'false');
+      setTimeout(() => deletePassword.focus(), 50);
+    }
+
+    function hideDeleteModal() {
+      deleteModal.classList.add('hidden');
+      deleteModal.setAttribute('aria-hidden', 'true');
+    }
+
+    updateBtn.addEventListener('click', () => {
+      if (!editingEnabled) {
+        showPasswordModal();
+      } else {
+        // lock edits
+        currentPassword = '';
+        setReadOnly(true);
+      }
+    });
+
+    modalCancel.addEventListener('click', hidePasswordModal);
+
+    modalSubmit.addEventListener('click', async () => {
+      const pw = modalPassword.value.trim();
+      if (!pw) return show(modalStatus, 'Enter password');
+      try {
+        const data = await apiRequest(`/api/files/${fileId}/display`, {
+          method: 'POST',
+          body: JSON.stringify({ password: pw }),
+        });
+        currentPassword = pw;
+        title.value = data.title || '';
+        description.value = data.description || '';
+        content.value = data.content || '';
+        currentAttachments = data.attachments || [];
+        renderAttachments();
+        setReadOnly(false);
+        hidePasswordModal();
+        clear(detailStatus);
+      } catch (err) {
+        show(modalStatus, err.message);
+      }
+    });
+
+    deleteSelectedBtn.addEventListener("click", async () => {
+      clear(detailStatus);
+      if (!selectedDeleteIds.size) return;
+      try {
+        await apiRequest(`/api/files/${fileId}/attachments/delete`, {
+          method: "POST",
+          body: JSON.stringify({
+            password: currentPassword,
+            attachment_ids: Array.from(selectedDeleteIds),
+          }),
+        });
+        const refreshed = await apiRequest(`/api/files/${fileId}/display`, {
+          method: "POST",
+          body: JSON.stringify({ password: currentPassword }),
+        });
+        currentAttachments = refreshed.attachments || [];
+        renderAttachments();
+      } catch (error) {
+        show(detailStatus, error.message);
+      }
+    });
+
+    selectAllBtn.addEventListener("click", () => {
+      if (!currentAttachments.length) return;
+      const shouldClear = selectedDeleteIds.size === currentAttachments.length;
+      selectedDeleteIds.clear();
+      attachmentList.querySelectorAll('input[type="checkbox"][data-attachment-id]').forEach((checkbox) => {
+        checkbox.checked = !shouldClear;
+        const key = String(checkbox.dataset.attachmentId || "");
+        if (!key) return;
+        if (shouldClear) {
+          selectedDeleteIds.delete(key);
+        } else {
+          selectedDeleteIds.add(key);
+        }
+      });
+      updateDeleteSelectedButton();
+    });
+
+    deleteFileBtn.addEventListener("click", async () => {
+      showDeleteModal();
+    });
+
+    deleteCancelBtn.addEventListener('click', hideDeleteModal);
+
+    deleteConfirmBtn.addEventListener('click', async () => {
+      const passwordValue = deletePassword.value.trim();
+      if (!passwordValue) return show(deleteStatus, 'Password required');
+      try {
+        await apiRequest(`/api/files/${fileId}/delete`, {
+          method: "POST",
+          body: JSON.stringify({ password: passwordValue }),
+        });
+        window.location.href = "/dashboard.html";
+      } catch (error) {
+        show(deleteStatus, error.message);
+      }
+    });
+  </script>
+</body>
+</html>

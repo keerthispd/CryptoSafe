@@ -6,18 +6,15 @@
   <title>CryptoSafe Dashboard</title>
   <style>
     :root {
-      --bg: #07111d;
-      --panel: rgba(11, 20, 34, 0.84);
+      --bg: #06101b;
+      --panel: rgba(9, 18, 30, 0.86);
       --panel-border: rgba(110, 231, 183, 0.12);
       --ink: #eff6ff;
-      --muted: #a6b4c2;
+      --muted: #9fb0c2;
       --accent: #6ee7b7;
       --accent-2: #38bdf8;
       --danger: #f43f5e;
-      --ok: #34d399;
       --chip: rgba(56, 189, 248, 0.12);
-      --input-bg: rgba(255, 255, 255, 0.04);
-      --input-border: rgba(166, 180, 194, 0.25);
     }
 
     * { box-sizing: border-box; }
@@ -28,46 +25,43 @@
       font-family: "Trebuchet MS", "Segoe UI", sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.18), transparent 28%),
-        radial-gradient(circle at 85% 20%, rgba(110, 231, 183, 0.16), transparent 24%),
+        radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.14), transparent 28%),
+        radial-gradient(circle at 85% 10%, rgba(110, 231, 183, 0.14), transparent 22%),
         linear-gradient(160deg, #020814, #081627 50%, #050d18);
       padding: 24px;
     }
 
-    .layout {
-      width: min(1220px, 100%);
-      margin: 0 auto;
-      display: grid;
-      gap: 20px;
-      grid-template-columns: 1.1fr 0.9fr;
-      align-items: start;
-    }
-
     .topbar {
-      grid-column: 1 / -1;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 16px;
+      width: min(1240px, 100%);
+      margin: 0 auto 18px;
       padding: 14px 18px;
       border-radius: 18px;
       background: rgba(255, 255, 255, 0.04);
       border: 1px solid rgba(166, 180, 194, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
     .brand {
       display: flex;
       flex-direction: column;
       gap: 4px;
+      margin-right: auto;
     }
 
     .brand strong {
-      font-size: 1.08rem;
+      font-size: 1.05rem;
       letter-spacing: 0.04em;
       text-transform: uppercase;
     }
 
-    .brand span { color: var(--muted); font-size: 0.92rem; }
+    .brand span {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
 
     .logout {
       color: #03111a;
@@ -78,30 +72,155 @@
       border-radius: 12px;
     }
 
-    .panel {
-      background: var(--panel);
-      border: 1px solid var(--panel-border);
-      border-radius: 24px;
-      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.32);
-      backdrop-filter: blur(14px);
-      padding: 24px;
+    .logout:hover,
+    .logout:focus-visible,
+    .delete-fab:hover,
+    .delete-fab:focus-visible,
+    .add-fab:hover,
+    .add-fab:focus-visible,
+    .tile:focus-visible,
+    button:focus-visible {
+      outline: 2px solid rgba(110, 231, 183, 0.72);
+      outline-offset: 2px;
     }
 
-    .panel h2 {
-      margin: 0 0 8px;
-      font-size: 1.4rem;
-      letter-spacing: 0.01em;
+    .account {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      margin-right: 6px;
     }
 
-    .panel .sub {
-      margin: 0 0 18px;
+    .account-user {
       color: var(--muted);
-      line-height: 1.5;
-      font-size: 0.95rem;
+      font-size: 0.82rem;
+      white-space: nowrap;
+    }
+
+    .delete-btn {
+      background: transparent;
+      color: var(--danger);
+      border: 1px solid rgba(244,63,94,0.12);
+      padding: 6px 8px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .wrap {
+      width: min(1240px, 100%);
+      margin: 0 auto;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 16px;
+    }
+
+    .tile {
+      position: relative;
+      min-height: 150px;
+      border: 1px solid rgba(110, 231, 183, 0.18);
+      border-radius: 20px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.035));
+      box-shadow: 0 22px 60px rgba(2, 8, 20, 0.5);
+      backdrop-filter: blur(14px);
+      padding: 16px;
+      color: var(--ink);
+      text-decoration: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.18s ease;
+    }
+
+    .tile-badge {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      min-width: 34px;
+      height: 24px;
+      padding: 0 7px;
+      border-radius: 8px;
+      background: linear-gradient(145deg, rgba(110, 231, 183, 0.24), rgba(56, 189, 248, 0.2));
+      border: 1px solid rgba(110, 231, 183, 0.24);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.03), 0 10px 24px rgba(0, 0, 0, 0.18), 0 0 18px rgba(56, 189, 248, 0.14);
+      color: #edfdf7;
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      text-shadow: 0 1px 0 rgba(2, 8, 20, 0.35);
+    }
+
+    .tile-badge::before {
+      content: "Open";
+      line-height: 1;
+    }
+
+    .tile:hover {
+      transform: translateY(-4px);
+      border-color: rgba(110, 231, 183, 0.48);
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.05));
+      box-shadow: 0 28px 72px rgba(2, 8, 20, 0.62);
+    }
+
+    .icon {
+      width: 68px;
+      height: 68px;
+      border-radius: 14px;
+      background: linear-gradient(145deg, rgba(110, 231, 183, 0.26), rgba(56, 189, 248, 0.22));
+      border: 1px solid rgba(239,246,255,0.08);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .icon::before {
+      content: "";
+      position: absolute;
+      right: 0;
+      top: 0;
+      border-left: 14px solid transparent;
+      border-top: 14px solid rgba(255, 255, 255, 0.14);
+      width: 0;
+      height: 0;
+    }
+
+    .icon::after {
+      content: "";
+      position: absolute;
+      inset: 14px 12px 12px;
+      border-radius: 10px;
+      border: 2px solid rgba(239, 246, 255, 0.75);
+      border-top-width: 6px;
+    }
+
+    .name {
+      font-weight: 800;
+      line-height: 1.18;
+      word-break: break-word;
+      font-size: 1.02rem;
+      margin-top: 58px;
+      color: var(--ink);
+    }
+
+    .meta {
+      color: rgba(239,246,255,0.86);
+      font-size: 0.9rem;
+      margin-top: 8px;
     }
 
     .status {
-      margin-bottom: 14px;
+      margin-bottom: 16px;
       padding: 10px 12px;
       border-radius: 12px;
       font-size: 0.92rem;
@@ -109,860 +228,380 @@
     }
 
     .status.show { display: block; }
-    .status.ok { background: rgba(52, 211, 153, 0.15); color: #a7f3d0; }
-    .status.error { background: rgba(244, 63, 94, 0.18); color: #fecdd3; }
+    .status.error { background: rgba(244, 63, 94, 0.16); color: #fecdd3; }
 
-    label {
-      display: block;
-      margin-bottom: 7px;
-      font-size: 0.9rem;
-      font-weight: 700;
-    }
-
-    .field { margin-bottom: 14px; }
-
-    input,
-    textarea {
-      width: 100%;
-      border: 1px solid var(--input-border);
-      border-radius: 12px;
-      padding: 11px 12px;
-      background: var(--input-bg);
-      color: var(--ink);
-      font: inherit;
-      outline: none;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    textarea {
-      min-height: 130px;
-      resize: vertical;
-    }
-
-    input:focus,
-    textarea:focus {
-      border-color: rgba(110, 231, 183, 0.8);
-      box-shadow: 0 0 0 4px rgba(110, 231, 183, 0.12);
-    }
-
-    .btn-row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    button {
-      border: 0;
-      border-radius: 10px;
-      padding: 10px 14px;
-      color: #02131f;
-      font: inherit;
-      font-weight: 700;
-      cursor: pointer;
-      transition: transform 0.15s ease, filter 0.15s ease;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    }
-
-    button.alt {
-      background: rgba(255, 255, 255, 0.08);
-      color: var(--ink);
-      border: 1px solid rgba(166, 180, 194, 0.2);
-    }
-
-    button.warn {
-      background: linear-gradient(135deg, #fb7185, #f43f5e);
-      color: white;
-    }
-
-    button:hover {
-      transform: translateY(-1px);
-      filter: brightness(1.05);
-    }
-
-    .files-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 12px;
-    }
-
-    .chip {
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: var(--chip);
-      color: #b6ebff;
-      font-size: 0.85rem;
-      font-weight: 700;
-    }
-
-    .file-list {
-      display: grid;
-      gap: 10px;
-      margin-bottom: 16px;
-    }
-
-    .file-card {
-      padding: 12px;
-      border-radius: 14px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(166, 180, 194, 0.14);
-    }
-
-    .file-card strong {
-      display: block;
-      margin-bottom: 4px;
-      font-size: 1rem;
-    }
-
-    .file-desc {
-      color: #d1e4f3;
-      font-size: 0.88rem;
-      margin-bottom: 8px;
-      line-height: 1.4;
-      opacity: 0.88;
-    }
-
-    .file-card small {
-      display: block;
-      color: var(--muted);
-      margin-bottom: 10px;
-    }
+    .hidden { display: none !important; }
 
     .empty {
       color: var(--muted);
-      font-size: 0.92rem;
       border: 1px dashed rgba(166, 180, 194, 0.2);
-      border-radius: 12px;
-      padding: 14px;
-    }
-
-    .viewer,
-    .editor {
-      margin-top: 12px;
-      padding: 14px;
-      border-radius: 14px;
+      border-radius: 18px;
+      padding: 24px;
       background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(166, 180, 194, 0.14);
+      text-align: center;
     }
 
-    .viewer textarea {
-      min-height: 160px;
+    .add-fab {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      width: 58px;
+      height: 58px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      text-decoration: none;
+      color: #02131f;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.34);
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1;
     }
 
-    .meta {
-      margin-top: 8px;
-      color: var(--muted);
-      font-size: 0.84rem;
-    }
-
-    .attachment-preview {
-      margin-top: 12px;
-      padding: 12px;
+    .delete-fab {
+      position: fixed;
+      left: 24px;
+      bottom: 24px;
+      background: linear-gradient(135deg, #ff7a7a, var(--danger));
+      color: #fff;
+      border: none;
+      padding: 10px 14px;
       border-radius: 12px;
-      border: 1px solid rgba(166, 180, 194, 0.16);
-      background: rgba(255, 255, 255, 0.03);
+      font-weight: 700;
+      box-shadow: 0 12px 30px rgba(244,63,94,0.24);
+      cursor: pointer;
+      z-index: 1000;
     }
 
-    .attachment-preview img,
-    .attachment-preview iframe,
-    .attachment-preview audio {
-      width: 100%;
-      border-radius: 10px;
-      border: 1px solid rgba(166, 180, 194, 0.2);
-      background: rgba(0, 0, 0, 0.2);
+    @media (max-width: 768px) {
+      body { padding: 18px; }
+      .topbar {
+        padding: 12px 14px;
+        gap: 10px;
+      }
+      .brand span { font-size: 0.84rem; }
+      .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+      .tile { min-height: 130px; padding: 12px; }
+      .icon { width: 52px; height: 52px; }
+      .name { margin-top: 48px; font-size: 0.9rem; }
+      .tile-badge {
+        right: 8px;
+        top: 8px;
+        min-width: 32px;
+        height: 20px;
+        padding: 0 6px;
+        font-size: 0.5rem;
+      }
+      .add-fab { right: 16px; bottom: 16px; }
+      .delete-fab { left: 16px; bottom: 16px; }
     }
 
-    .attachment-preview img {
-      max-height: 380px;
-      object-fit: contain;
+    @media (min-width: 769px) and (max-width: 1024px) and (orientation: landscape) {
+      body { padding: 20px; }
+      .topbar { padding: 12px 16px; }
+      .brand span { font-size: 0.82rem; }
+      .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+      .tile { min-height: 134px; padding: 12px; }
+      .icon { width: 52px; height: 52px; }
+      .name { margin-top: 48px; }
+      .tile-badge {
+        right: 8px;
+        top: 8px;
+        min-width: 30px;
+        height: 18px;
+        padding: 0 6px;
+        font-size: 0.5rem;
+      }
+      .add-fab { right: 18px; bottom: 18px; }
+      .delete-fab { left: 18px; bottom: 18px; }
     }
 
-    .attachment-preview iframe {
-      min-height: 360px;
+    @media (max-width: 640px) {
+      body { padding: 14px; }
+      .topbar {
+        padding: 12px 14px;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .brand span { font-size: 0.8rem; }
+      .brand { margin-right: 0; }
+      .account {
+        align-items: flex-start;
+        margin-right: 0;
+      }
+      .topbar > div:last-child {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+      .tile { min-height: 126px; padding: 12px; }
+      .icon { width: 50px; height: 50px; }
+      .name { margin-top: 46px; font-size: 0.88rem; }
+      .tile-badge {
+        right: 8px;
+        top: 8px;
+        min-width: 30px;
+        height: 20px;
+        padding: 0 6px;
+        font-size: 0.5rem;
+      }
+      .add-fab { right: 14px; bottom: 14px; }
+      .delete-fab { left: 14px; bottom: 14px; }
+    }
+    /* Make large/full-screen tiles match the smaller, denser layout for clarity */
+    @media (min-width: 1025px) {
+      .tile {
+        min-height: 132px;
+        padding: 12px;
+      }
+      .icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 12px;
+      }
+      .name {
+        margin-top: 48px;
+        font-size: 0.94rem;
+      }
+      .tile-badge {
+        right: 10px;
+        top: 10px;
+        min-width: 32px;
+        height: 20px;
+        font-size: 0.56rem;
+      }
+    }
+    /* Modal styles (small) */
+    .modal-backdrop { position: fixed; inset: 0; display:flex; align-items:center; justify-content:center; background: rgba(2,6,23,0.6); z-index:1200; padding:20px; }
+    .modal-backdrop {
+      backdrop-filter: blur(10px);
+      animation: fadeIn 0.18s ease-out;
+    }
+    .modal {
+      width:100%;
+      max-width:420px;
+      background: var(--panel);
+      border:1px solid var(--panel-border);
+      padding:16px;
+      border-radius:12px;
+      box-shadow: 0 20px 55px rgba(0,0,0,0.32);
+      animation: scaleIn 0.18s ease-out;
+    }
+    .btn-row { display:flex; gap:10px; justify-content:flex-end; margin-top:12px; }
+    .btn-row button { padding:8px 12px; border-radius:10px; border:none; cursor:pointer; font-weight:700; }
+    .btn-row .alt { background: transparent; color: var(--muted); border:1px solid rgba(255,255,255,0.04); }
+    .btn-row .primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #02131f; }
+    .btn-row .danger { background: linear-gradient(135deg, #ff7a7a, var(--danger)); color:#fff; }
+    .modal h3 { margin:0 0 8px; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
 
-    .attachment-preview pre {
-      margin: 0;
-      max-height: 280px;
-      overflow: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
-      font: 0.86rem/1.45 Consolas, "Courier New", monospace;
-      color: #d8e7f5;
-    }
-
-    .hint {
-      margin-top: 6px;
-      color: var(--muted);
-      font-size: 0.82rem;
-      line-height: 1.4;
-    }
-
-    @media (max-width: 950px) {
-      .layout { grid-template-columns: 1fr; }
-      .topbar { flex-direction: column; align-items: flex-start; }
+    @keyframes scaleIn {
+      from { opacity: 0; transform: translateY(8px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
     }
   </style>
 </head>
 <body>
-  <div class="layout">
-    <header class="topbar">
-      <div class="brand">
-        <strong>CryptoSafe Vault</strong>
-        <span>Your secure space for storing sensitive information</span>
+  <header class="topbar">
+    <div class="brand">
+      <strong>CryptoSafe Vault</strong>
+      <span>Your safe space for secure files and passwords.</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="account">
+        <div class="account-user">Signed in: <span id="accountUserId">—</span></div>
       </div>
       <a class="logout" href="/logout">Logout</a>
-    </header>
+    </div>
+  </header>
 
-    <section class="panel">
-      <h2>Create File</h2>
-      <p class="sub">Create a folder item with title, short description, and encrypted details content.</p>
-      <div id="createStatus" class="status"></div>
+  <main class="wrap">
+    <div id="listStatus" class="status"></div>
+    <section id="fileGrid" class="grid"></section>
+  </main>
 
-      <form id="createForm">
-        <div class="field">
-          <label for="newTitle">Title</label>
-          <input id="newTitle" name="title" type="text" maxlength="120" required />
-        </div>
+  <a class="add-fab" href="/file-new.html" aria-label="Add file">+</a>
 
-        <div class="field">
-          <label for="newDescription">Short Description</label>
-          <input id="newDescription" name="description" type="text" maxlength="180" placeholder="e.g., Primary bank account credentials" />
-        </div>
-
-        <div class="field">
-          <label for="newContent">Details (passwords, bank details, notes)</label>
-          <textarea id="newContent" name="content"></textarea>
-        </div>
-
-        <div class="field">
-          <label for="newUploadFile">Upload image, audio, or document (optional)</label>
-          <input id="newUploadFile" name="upload_file" type="file" accept="image/*,audio/*,.pdf,.doc,.docx,.txt,.rtf,.csv,.xls,.xlsx,.ppt,.pptx,.mp3,.wav,.m4a,.ogg,.aac,.flac" />
-          <div class="hint">Allowed: images, audio (mp3/wav/m4a/ogg/aac/flac), PDF, Word, text, CSV, Excel, PowerPoint. Max size: 10 MB.</div>
-        </div>
-
-        <div class="btn-row">
-          <button type="submit">Create file</button>
-          <button type="button" class="alt" id="clearCreate">Clear</button>
-        </div>
-      </form>
-
-      <div class="viewer" id="viewer">
-        <h2 style="margin-top:0; font-size:1.1rem;">Display File Content</h2>
-        <p class="sub" style="margin-bottom:10px;">Display requires your password confirmation.</p>
-        <div id="viewStatus" class="status"></div>
-        <div class="field">
-          <label for="viewTitle">Title</label>
-          <input id="viewTitle" type="text" readonly />
-        </div>
-        <div class="field">
-          <label for="viewDescription">Short Description</label>
-          <input id="viewDescription" type="text" readonly />
-        </div>
-        <div class="field">
-          <label for="viewContent">Details</label>
-          <textarea id="viewContent" readonly></textarea>
-        </div>
-        <div class="field">
-          <label>Uploaded file</label>
-          <input id="viewUploadInfo" type="text" readonly value="No uploaded file" />
-        </div>
-        <div class="btn-row">
-          <button type="button" class="alt" id="downloadFileBtn" style="display:none;">Download uploaded file</button>
-        </div>
-        <div id="attachmentPreview" class="attachment-preview" style="display:none;">
-          <div id="attachmentPreviewLabel" class="hint" style="margin-top:0; margin-bottom:8px;"></div>
-          <div id="attachmentPreviewBody"></div>
-        </div>
-        <div class="meta" id="viewMeta"></div>
+  <button id="deleteAccountBtn" class="delete-fab" title="Delete your account">Delete account</button>
+  <!-- Account delete confirm modal (step 1) -->
+  <div id="acctConfirmModal" class="hidden modal-backdrop" aria-hidden="true">
+    <div class="modal">
+      <h3>Confirm account deletion</h3>
+      <p>This will permanently remove your account and all stored files. This action cannot be undone.</p>
+      <div class="btn-row">
+        <button type="button" id="acctConfirmCancel" class="alt">Cancel</button>
+        <button type="button" id="acctConfirm" class="danger">I'm sure — Continue</button>
       </div>
-    </section>
+    </div>
+  </div>
 
-    <aside class="panel">
-      <div class="files-header">
-        <h2 style="margin:0;">Folder Files</h2>
-        <span class="chip" id="fileCount">0 files</span>
+  <!-- Account delete password modal (step 2) -->
+  <div id="acctModal" class="hidden modal-backdrop" aria-hidden="true">
+    <div class="modal">
+      <h3>Delete account</h3>
+      <p>Please enter your account password to confirm permanent deletion.</p>
+      <div class="field">
+        <label for="acctPassword">Password</label>
+        <input id="acctPassword" type="password" autocomplete="current-password" />
       </div>
-      <div id="listStatus" class="status"></div>
-      <div id="fileList" class="file-list"></div>
-
-      <div class="editor" id="editor" style="display:none;">
-        <h2 style="margin-top:0; font-size:1.1rem;">Update File</h2>
-        <div id="editStatus" class="status"></div>
-        <input type="hidden" id="editFileId" />
-        <div class="field">
-          <label for="editTitle">Title</label>
-          <input id="editTitle" type="text" maxlength="120" required />
-        </div>
-        <div class="field">
-          <label for="editDescription">Short Description</label>
-          <input id="editDescription" type="text" maxlength="180" />
-        </div>
-        <div class="field">
-          <label for="editContent">Details</label>
-          <textarea id="editContent"></textarea>
-        </div>
-        <div class="field">
-          <label for="editUploadFile">Replace uploaded file (optional)</label>
-          <input id="editUploadFile" type="file" accept="image/*,audio/*,.pdf,.doc,.docx,.txt,.rtf,.csv,.xls,.xlsx,.ppt,.pptx,.mp3,.wav,.m4a,.ogg,.aac,.flac" />
-          <div class="hint">Allowed: images, audio (mp3/wav/m4a/ogg/aac/flac), PDF, Word, text, CSV, Excel, PowerPoint. Max size: 10 MB.</div>
-        </div>
-        <div class="field" style="display:flex; align-items:center; gap:8px;">
-          <input id="editRemoveUpload" type="checkbox" style="width:auto;" />
-          <label for="editRemoveUpload" style="margin:0;">Remove existing uploaded file</label>
-        </div>
-        <div class="field">
-          <label for="editPassword">Confirm account password</label>
-          <input id="editPassword" type="password" required />
-        </div>
-        <div class="btn-row">
-          <button type="button" id="saveUpdate">Update file</button>
-          <button type="button" class="alt" id="cancelEdit">Cancel</button>
-        </div>
+      <div class="btn-row">
+        <button type="button" id="acctCancel" class="alt">Cancel</button>
+        <button type="button" id="acctSubmit" class="danger">Delete account</button>
       </div>
-    </aside>
-
-    <section class="panel" style="grid-column: 1 / -1;">
-      <div>
-        <h2 style="margin: 0 0 8px;">Account Settings</h2>
-        <div class="sub" style="margin: 0 0 12px;">
-          User ID: <strong id="accountUserId">Loading...</strong>
-        </div>
-        <button type="button" class="warn" id="deleteAccountBtn" style="width: 100%;">Delete Account</button>
-        <div id="deleteAccountStatus" class="status" style="margin-top: 12px;"></div>
-      </div>
-    </section>
+      <div id="acctStatus" class="status"></div>
+    </div>
   </div>
 
   <script>
-    const createForm = document.getElementById("createForm");
-    const createStatus = document.getElementById("createStatus");
     const listStatus = document.getElementById("listStatus");
-    const viewStatus = document.getElementById("viewStatus");
-    const editStatus = document.getElementById("editStatus");
-    const fileList = document.getElementById("fileList");
-    const fileCount = document.getElementById("fileCount");
-    const clearCreate = document.getElementById("clearCreate");
+    const fileGrid = document.getElementById("fileGrid");
 
-    const viewTitle = document.getElementById("viewTitle");
-    const viewDescription = document.getElementById("viewDescription");
-    const viewContent = document.getElementById("viewContent");
-    const viewMeta = document.getElementById("viewMeta");
-    const viewUploadInfo = document.getElementById("viewUploadInfo");
-    const downloadFileBtn = document.getElementById("downloadFileBtn");
-    const attachmentPreview = document.getElementById("attachmentPreview");
-    const attachmentPreviewLabel = document.getElementById("attachmentPreviewLabel");
-    const attachmentPreviewBody = document.getElementById("attachmentPreviewBody");
+    function showStatus(message) {
+      listStatus.textContent = message;
+      listStatus.className = "status show error";
+    }
 
-    const editor = document.getElementById("editor");
-    const editFileId = document.getElementById("editFileId");
-    const editTitle = document.getElementById("editTitle");
-    const editDescription = document.getElementById("editDescription");
-    const editContent = document.getElementById("editContent");
-    const editUploadFile = document.getElementById("editUploadFile");
-    const editRemoveUpload = document.getElementById("editRemoveUpload");
-    const editPassword = document.getElementById("editPassword");
-    const saveUpdate = document.getElementById("saveUpdate");
-    const cancelEdit = document.getElementById("cancelEdit");
-
-    const deleteAccountBtn = document.getElementById("deleteAccountBtn");
-    const deleteAccountStatus = document.getElementById("deleteAccountStatus");
-    const accountUserId = document.getElementById("accountUserId");
-    let currentAttachmentPreviewUrl = "";
-
-    function showStatus(node, message, kind) {
+    function showModalStatus(node, message, kind = 'error') {
       node.textContent = message;
       node.className = `status show ${kind}`;
     }
 
-    function clearStatus(node) {
-      node.textContent = "";
-      node.className = "status";
-    }
-
-    function formatBytes(bytes) {
-      const value = Number(bytes) || 0;
-      if (value < 1024) {
-        return `${value} B`;
-      }
-      const units = ["KB", "MB", "GB"];
-      let size = value;
-      let idx = -1;
-      while (size >= 1024 && idx < units.length - 1) {
-        size /= 1024;
-        idx += 1;
-      }
-      return `${size.toFixed(size >= 10 || idx === 0 ? 1 : 2)} ${units[idx]}`;
-    }
-
-    function clearAttachmentPreview() {
-      if (currentAttachmentPreviewUrl) {
-        URL.revokeObjectURL(currentAttachmentPreviewUrl);
-        currentAttachmentPreviewUrl = "";
-      }
-      attachmentPreview.style.display = "none";
-      attachmentPreviewLabel.textContent = "";
-      attachmentPreviewBody.innerHTML = "";
-    }
-
-    function blobFromBase64(base64Content, mimeType) {
-      const binary = atob(base64Content || "");
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i += 1) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      return new Blob([bytes], { type: mimeType || "application/octet-stream" });
-    }
-
-    async function renderAttachmentPreview(fileId, password, fallbackMime, fallbackName) {
-      clearAttachmentPreview();
-
-      const payload = await apiRequest(`/api/files/${fileId}/attachment`, {
-        method: "POST",
-        body: JSON.stringify({ password }),
-      });
-
-      const mimeType = (payload.uploaded_file_mime || fallbackMime || "application/octet-stream").toLowerCase();
-      const fileName = payload.uploaded_file_name || fallbackName || "uploaded-file";
-      const blob = blobFromBase64(payload.content_base64 || "", mimeType);
-      const previewUrl = URL.createObjectURL(blob);
-      currentAttachmentPreviewUrl = previewUrl;
-
-      attachmentPreviewLabel.textContent = `Inline preview: ${fileName} (${formatBytes(payload.uploaded_file_size || 0)})`;
-      attachmentPreview.style.display = "block";
-
-      if (mimeType.startsWith("image/")) {
-        const image = document.createElement("img");
-        image.src = previewUrl;
-        image.alt = fileName;
-        attachmentPreviewBody.appendChild(image);
-        return;
-      }
-
-      if (mimeType.startsWith("audio/")) {
-        const audio = document.createElement("audio");
-        audio.controls = true;
-        audio.preload = "metadata";
-        audio.src = previewUrl;
-        attachmentPreviewBody.appendChild(audio);
-        return;
-      }
-
-      if (mimeType === "application/pdf") {
-        const frame = document.createElement("iframe");
-        frame.src = previewUrl;
-        frame.title = fileName;
-        attachmentPreviewBody.appendChild(frame);
-        return;
-      }
-
-      if (mimeType.startsWith("text/") || mimeType === "application/rtf") {
-        const textContent = await blob.text();
-        const textNode = document.createElement("pre");
-        textNode.textContent = textContent;
-        attachmentPreviewBody.appendChild(textNode);
-        return;
-      }
-
-      const fallback = document.createElement("div");
-      fallback.className = "hint";
-      fallback.style.marginTop = "0";
-      fallback.textContent = "This file type cannot be rendered inline here. Use download to open it in a native app.";
-      attachmentPreviewBody.appendChild(fallback);
-    }
-
     async function apiRequest(url, options = {}) {
-      const isFormData = options.body instanceof FormData;
-      const headers = { ...(options.headers || {}) };
-      if (!isFormData) {
-        headers["Content-Type"] = headers["Content-Type"] || "application/json";
-      }
-
       const response = await fetch(url, {
         ...options,
-        headers,
+        headers: {
+          "Content-Type": "application/json",
+          ...(options.headers || {}),
+        },
       });
-      const raw = await response.text();
+      const text = await response.text();
       let data = {};
       try {
-        data = raw ? JSON.parse(raw) : {};
-      } catch (parseError) {
+        data = text ? JSON.parse(text) : {};
+      } catch (_) {
         data = {};
       }
       if (!response.ok) {
-        const textFallback = raw && !raw.trim().startsWith("<") ? raw.trim() : "";
-        const message = data.error || data.message || textFallback || `Request failed (${response.status}).`;
-        throw new Error(message);
+        throw new Error(data.error || data.message || `Request failed (${response.status}).`);
       }
       return data;
     }
 
-    async function loadAccountInfo() {
-      try {
-        const data = await apiRequest("/api/files");
-        accountUserId.textContent = data.userid || "Unknown";
-      } catch (error) {
-        accountUserId.textContent = "Unavailable";
-        showStatus(deleteAccountStatus, `Unable to load user ID: ${error.message}`, "error");
-      }
-    }
-
-    deleteAccountBtn.addEventListener("click", async () => {
-      clearStatus(deleteAccountStatus);
-
-      const warningConfirmed = confirm(
-        "Warning: Deleting your account will permanently erase all your vault files and data. This cannot be undone. Continue?"
-      );
-      if (!warningConfirmed) {
-        return;
-      }
-
-      const password = prompt("Enter your account password to confirm deletion:");
-      if (!password) {
-        showStatus(deleteAccountStatus, "Account deletion cancelled. Password confirmation is required.", "error");
-        return;
-      }
-
-      const finalConfirmed = confirm("Final confirmation: Do you really want to permanently delete your account?");
-      if (!finalConfirmed) {
-        showStatus(deleteAccountStatus, "Account deletion cancelled.", "error");
-        return;
-      }
-
-      try {
-        await apiRequest("/api/account/delete", {
-          method: "POST",
-          body: JSON.stringify({ password }),
-        });
-        showStatus(deleteAccountStatus, "Account deleted successfully. Redirecting to login...", "ok");
-        setTimeout(() => {
-          window.location.href = "/login.html";
-        }, 1200);
-      } catch (error) {
-        showStatus(deleteAccountStatus, error.message, "error");
-      }
-    });
     function renderFiles(files) {
-      fileList.innerHTML = "";
-      fileCount.textContent = `${files.length} file${files.length === 1 ? "" : "s"}`;
+      fileGrid.innerHTML = "";
 
       if (!files.length) {
         const empty = document.createElement("div");
         empty.className = "empty";
-        empty.textContent = "No files yet. Create your first file from the left panel.";
-        fileList.appendChild(empty);
+        empty.textContent = "";
+        fileGrid.appendChild(empty);
         return;
       }
 
       files.forEach((file) => {
-        const card = document.createElement("div");
-        card.className = "file-card";
+        const tile = document.createElement("a");
+        tile.className = "tile";
+        tile.href = `/file-detail.html?id=${encodeURIComponent(file.id)}`;
+        tile.title = file.title;
 
-        const title = document.createElement("strong");
-        title.textContent = file.title;
+        const top = document.createElement("div");
+        const badge = document.createElement("div");
+        badge.className = "tile-badge";
+        badge.setAttribute('aria-label', 'Open file');
+        const icon = document.createElement("div");
+        icon.className = "icon";
+        top.append(badge, icon);
 
-        const desc = document.createElement("div");
-        desc.className = "file-desc";
-        desc.textContent = file.description || "No description provided.";
+        const bottom = document.createElement("div");
+        const name = document.createElement("div");
+        name.className = "name";
+        name.textContent = file.title;
+        bottom.appendChild(name);
 
-        const uploadMeta = document.createElement("small");
-        uploadMeta.textContent = file.has_uploaded_file
-          ? `Attachment: ${file.uploaded_file_name} (${formatBytes(file.uploaded_file_size)})`
-          : "Attachment: none";
-
-        const meta = document.createElement("small");
-        meta.textContent = `Created: ${new Date(file.created_at).toLocaleString()} | Updated: ${new Date(file.updated_at).toLocaleString()}`;
-
-        const actions = document.createElement("div");
-        actions.className = "btn-row";
-
-        const displayBtn = document.createElement("button");
-        displayBtn.type = "button";
-        displayBtn.textContent = "Display";
-        displayBtn.className = "alt";
-        displayBtn.onclick = () => displayFile(file.id);
-
-        const updateBtn = document.createElement("button");
-        updateBtn.type = "button";
-        updateBtn.textContent = "Update";
-        updateBtn.onclick = () => beginEdit(file.id, file.title);
-
-        const deleteBtn = document.createElement("button");
-        deleteBtn.type = "button";
-        deleteBtn.textContent = "Delete";
-        deleteBtn.className = "warn";
-        deleteBtn.onclick = () => deleteFile(file.id, file.title);
-
-        actions.append(displayBtn, updateBtn, deleteBtn);
-        card.append(title, desc, uploadMeta, meta, actions);
-        fileList.appendChild(card);
+        tile.append(top, bottom);
+        fileGrid.appendChild(tile);
       });
     }
 
     async function loadFiles() {
-      clearStatus(listStatus);
       try {
-        const data = await apiRequest("/api/files");
+        const data = await apiRequest("/api/files", { method: "GET" });
         renderFiles(data.files || []);
       } catch (error) {
-        showStatus(listStatus, error.message, "error");
+        showStatus(error.message);
       }
     }
 
-    async function displayFile(fileId) {
-      clearStatus(viewStatus);
-      clearAttachmentPreview();
-      const password = prompt("Confirm your account password to display this file:");
-      if (!password) {
-        showStatus(viewStatus, "Display cancelled. Password confirmation required.", "error");
-        return;
-      }
-
-      try {
-        const data = await apiRequest(`/api/files/${fileId}/display`, {
-          method: "POST",
-          body: JSON.stringify({ password }),
-        });
-        viewTitle.value = data.title || "";
-        viewDescription.value = data.description || "";
-        viewContent.value = data.content || "";
-        if (data.has_uploaded_file) {
-          const uploadName = data.uploaded_file_name || "encrypted-upload";
-          const uploadSize = formatBytes(data.uploaded_file_size || 0);
-          viewUploadInfo.value = `${uploadName} (${uploadSize})`;
-          downloadFileBtn.style.display = "inline-block";
-          downloadFileBtn.dataset.fileId = String(fileId);
-          await renderAttachmentPreview(fileId, password, data.uploaded_file_mime, uploadName);
-        } else {
-          viewUploadInfo.value = "No uploaded file";
-          downloadFileBtn.style.display = "none";
-          downloadFileBtn.dataset.fileId = "";
-          clearAttachmentPreview();
-        }
-        viewMeta.textContent = `Created: ${new Date(data.created_at).toLocaleString()} | Updated: ${new Date(data.updated_at).toLocaleString()}`;
-        showStatus(viewStatus, "File displayed successfully.", "ok");
-      } catch (error) {
-        showStatus(viewStatus, error.message, "error");
-      }
-    }
-
-    async function beginEdit(fileId, fallbackTitle) {
-      clearStatus(editStatus);
-      const password = prompt("Confirm your account password to load this file for update:");
-      if (!password) {
-        showStatus(editStatus, "Update cancelled. Password confirmation required.", "error");
-        editor.style.display = "block";
-        return;
-      }
-
-      try {
-        const data = await apiRequest(`/api/files/${fileId}/display`, {
-          method: "POST",
-          body: JSON.stringify({ password }),
-        });
-        editFileId.value = String(fileId);
-        editTitle.value = data.title || fallbackTitle || "";
-        editDescription.value = data.description || "";
-        editContent.value = data.content || "";
-        editUploadFile.value = "";
-        editRemoveUpload.checked = false;
-        editPassword.value = "";
-        editor.style.display = "block";
-        showStatus(editStatus, "File loaded. Enter password again to confirm update.", "ok");
-      } catch (error) {
-        editor.style.display = "block";
-        showStatus(editStatus, error.message, "error");
-      }
-    }
-
-    async function deleteFile(fileId, title) {
-      clearStatus(listStatus);
-      const confirmed = confirm(`Delete file \"${title}\"?`);
-      if (!confirmed) {
-        return;
-      }
-
-      const password = prompt("Confirm your account password to delete this file:");
-      if (!password) {
-        showStatus(listStatus, "Delete cancelled. Password confirmation required.", "error");
-        return;
-      }
-
-      try {
-        await apiRequest(`/api/files/${fileId}/delete`, {
-          method: "POST",
-          body: JSON.stringify({ password }),
-        });
-        showStatus(listStatus, "File deleted successfully.", "ok");
-        await loadFiles();
-      } catch (error) {
-        showStatus(listStatus, error.message, "error");
-      }
-    }
-
-    createForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      clearStatus(createStatus);
-
-      const title = document.getElementById("newTitle").value.trim();
-      const description = document.getElementById("newDescription").value.trim();
-      const content = document.getElementById("newContent").value;
-      const uploadFile = document.getElementById("newUploadFile").files[0] || null;
-      if (!title) {
-        showStatus(createStatus, "Title is required.", "error");
-        return;
-      }
-      if (!content.trim() && !uploadFile) {
-        showStatus(createStatus, "Provide details text or upload an image/audio/document.", "error");
-        return;
-      }
-
-      try {
-        const formData = new FormData();
-        formData.append("title", title);
-        formData.append("description", description);
-        formData.append("content", content);
-        if (uploadFile) {
-          formData.append("upload_file", uploadFile);
-        }
-
-        await apiRequest("/api/files", {
-          method: "POST",
-          body: formData,
-        });
-        showStatus(createStatus, "File created successfully.", "ok");
-        createForm.reset();
-        await loadFiles();
-      } catch (error) {
-        showStatus(createStatus, error.message, "error");
-      }
-    });
-
-    clearCreate.addEventListener("click", () => {
-      createForm.reset();
-      clearStatus(createStatus);
-    });
-
-    saveUpdate.addEventListener("click", async () => {
-      clearStatus(editStatus);
-      const fileId = editFileId.value;
-      const title = editTitle.value.trim();
-      const description = editDescription.value.trim();
-      const content = editContent.value;
-      const uploadFile = editUploadFile.files[0] || null;
-      const removeUpload = editRemoveUpload.checked;
-      const password = editPassword.value;
-
-      if (!fileId) {
-        showStatus(editStatus, "Select a file first.", "error");
-        return;
-      }
-      if (!title) {
-        showStatus(editStatus, "Title is required.", "error");
-        return;
-      }
-      if (!password) {
-        showStatus(editStatus, "Password confirmation is required for update.", "error");
-        return;
-      }
-
-      try {
-        const formData = new FormData();
-        formData.append("title", title);
-        formData.append("description", description);
-        formData.append("content", content);
-        formData.append("password", password);
-        formData.append("remove_upload", removeUpload ? "true" : "false");
-        if (uploadFile) {
-          formData.append("upload_file", uploadFile);
-        }
-
-        await apiRequest(`/api/files/${fileId}/update`, {
-          method: "POST",
-          body: formData,
-        });
-        showStatus(editStatus, "File updated successfully.", "ok");
-        editUploadFile.value = "";
-        editRemoveUpload.checked = false;
-        editPassword.value = "";
-        await loadFiles();
-      } catch (error) {
-        showStatus(editStatus, error.message, "error");
-      }
-    });
-
-    cancelEdit.addEventListener("click", () => {
-      editor.style.display = "none";
-      editFileId.value = "";
-      editTitle.value = "";
-      editDescription.value = "";
-      editContent.value = "";
-      editUploadFile.value = "";
-      editRemoveUpload.checked = false;
-      editPassword.value = "";
-      clearStatus(editStatus);
-    });
-
-    downloadFileBtn.addEventListener("click", async () => {
-      clearStatus(viewStatus);
-      const fileId = downloadFileBtn.dataset.fileId;
-      if (!fileId) {
-        showStatus(viewStatus, "Display a file first to download its attachment.", "error");
-        return;
-      }
-
-      const password = prompt("Confirm your account password to download this uploaded file:");
-      if (!password) {
-        showStatus(viewStatus, "Download cancelled. Password confirmation required.", "error");
-        return;
-      }
-
-      try {
-        const response = await fetch(`/api/files/${fileId}/download`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ password }),
-        });
-
-        if (!response.ok) {
-          const text = await response.text();
-          let message = `Download failed (${response.status}).`;
-          try {
-            const parsed = text ? JSON.parse(text) : {};
-            if (parsed.error || parsed.message) {
-              message = parsed.error || parsed.message;
-            }
-          } catch (_) {
-            if (text && !text.trim().startsWith("<")) {
-              message = text.trim();
-            }
-          }
-          throw new Error(message);
-        }
-
-        const blob = await response.blob();
-        const contentDisposition = response.headers.get("Content-Disposition") || "";
-        const nameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
-        const suggestedName = nameMatch ? nameMatch[1] : "vault-download";
-
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = url;
-        anchor.download = suggestedName;
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-        URL.revokeObjectURL(url);
-
-        showStatus(viewStatus, "Downloaded uploaded file successfully.", "ok");
-      } catch (error) {
-        showStatus(viewStatus, error.message, "error");
-      }
-    });
-
-    loadAccountInfo();
     loadFiles();
+  </script>
+  <script>
+    // Account UI: fetch current userid and wire delete-account action
+    (function(){
+      const idEl = document.getElementById('accountUserId');
+      const delBtn = document.getElementById('deleteAccountBtn');
+      async function fetchAccount(){
+        try{
+          const res = await fetch('/api/account');
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data && data.userid) idEl.textContent = data.userid;
+        }catch(e){}
+      }
+
+      const acctConfirmModal = document.getElementById('acctConfirmModal');
+      const acctConfirm = document.getElementById('acctConfirm');
+      const acctConfirmCancel = document.getElementById('acctConfirmCancel');
+
+      const acctModal = document.getElementById('acctModal');
+      const acctPassword = document.getElementById('acctPassword');
+      const acctSubmit = document.getElementById('acctSubmit');
+      const acctCancel = document.getElementById('acctCancel');
+      const acctStatus = document.getElementById('acctStatus');
+
+      function showAcctConfirm(){ acctConfirmModal.classList.remove('hidden'); acctConfirmModal.setAttribute('aria-hidden','false'); }
+      function hideAcctConfirm(){ acctConfirmModal.classList.add('hidden'); acctConfirmModal.setAttribute('aria-hidden','true'); }
+
+      function showAcctModal(){ acctStatus.textContent=''; acctStatus.className='status'; acctModal.classList.remove('hidden'); acctModal.setAttribute('aria-hidden','false'); setTimeout(()=>acctPassword.focus(),50); }
+      function hideAcctModal(){ acctModal.classList.add('hidden'); acctModal.setAttribute('aria-hidden','true'); }
+
+      // Step 1: open confirmation
+      delBtn.addEventListener('click', ()=>{ showAcctConfirm(); });
+      acctConfirmCancel.addEventListener('click', hideAcctConfirm);
+
+      // Continue to password step
+      acctConfirm.addEventListener('click', ()=>{ hideAcctConfirm(); showAcctModal(); });
+
+      acctCancel.addEventListener('click', hideAcctModal);
+
+      acctSubmit.addEventListener('click', async ()=>{
+        const pwd = acctPassword.value.trim();
+        if (!pwd) return showModalStatus(acctStatus,'Password required');
+        acctSubmit.disabled = true; acctSubmit.textContent = 'Deleting...';
+        try{
+          const res = await fetch('/api/account/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: pwd })
+          });
+          const json = await res.json();
+          if (!res.ok) {
+            showModalStatus(acctStatus, json.error || json.message || 'Failed to delete account');
+            acctSubmit.disabled = false; acctSubmit.textContent = 'Delete account';
+            return;
+          }
+          window.location.href = '/landing.html';
+        }catch(err){ showModalStatus(acctStatus,'Network error while deleting account.'); acctSubmit.disabled = false; acctSubmit.textContent = 'Delete account'; }
+      });
+
+      fetchAccount();
+    })();
   </script>
 </body>
 </html>
