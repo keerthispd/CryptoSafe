@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Complete biometric verification</title>
+  <style>
+    body{font-family:Segoe UI,Arial,sans-serif;background:#061827;color:#e6f6f5;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+    .box{background:rgba(2,18,24,0.8);padding:24px;border-radius:12px;border:1px solid rgba(94,234,212,0.08);width:360px;text-align:center}
+    button{background:#5eead4;border:none;padding:10px 14px;border-radius:8px;font-weight:700}
+    .meta{color:#9cb6c7;margin-top:12px}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Complete biometric verification</h1>
+    <p class="meta">Approve biometric (fingerprint/face) on this device to complete sign-in on the other device.</p>
+    <div id="status" style="margin:12px 0;color:#fda4af"></div>
+    <button id="start">Start biometric on this device</button>
+  </div>
+
+  <script>
+    function base64urlToArrayBuffer(value){const base64=value.replace(/-/g,'+').replace(/_/g,'/');const padded=base64+"=".repeat((4-(base64.length%4))%4);const binary=atob(padded);const bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)}
+    function bufferToBase64url(input){const bytes=input instanceof Uint8Array?input:new Uint8Array(input);let binary='';for(const b of bytes)binary+=String.fromCharCode(b);return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,'')}
+
+    const statusEl=document.getElementById('status');
+    const start=document.getElementById('start');
+    const token = location.pathname.split('/').pop();
+
+    start.addEventListener('click', async ()=>{
+      statusEl.textContent='Preparing...';
+      try{
+        const optsRes=await fetch('/api/biometric/qr/'+encodeURIComponent(token)+'/options',{method:'POST'});
+        const optsJson=await optsRes.json();
+        if(!optsRes.ok){ statusEl.textContent=optsJson.error||'Unable to get options'; return; }
+        const options=optsJson;
+        options.challenge=base64urlToArrayBuffer(options.challenge);
+        options.allowCredentials=(Array.isArray(options.allowCredentials)?options.allowCredentials:[]).map(item=>({...item,id:base64urlToArrayBuffer(String(item.id))}));
+        const assertion=await navigator.credentials.get({ publicKey: options });
+        if(!assertion){ statusEl.textContent='Cancelled.'; return; }
+        const credential={ id: assertion.id, rawId: bufferToBase64url(assertion.rawId), type: assertion.type, response: { authenticatorData: bufferToBase64url(assertion.response.authenticatorData), clientDataJSON: bufferToBase64url(assertion.response.clientDataJSON), signature: bufferToBase64url(assertion.response.signature), userHandle: assertion.response.userHandle?bufferToBase64url(assertion.response.userHandle):null }, clientExtensionResults: assertion.getClientExtensionResults() };
+        statusEl.textContent='Verifying...';
+        const vres=await fetch('/api/biometric/qr/'+encodeURIComponent(token)+'/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential})});
+        const vj=await vres.json().catch(()=>null);
+        if(!vres.ok){ statusEl.textContent=(vj&&vj.error)||'Verification failed'; return; }
+        statusEl.style.color='var(--success, #5eead4)'; statusEl.textContent='Verified — you can return to the other device.';
+      }catch(e){ statusEl.textContent=String(e); }
+    });
+  </script>
+</body>
+</html>

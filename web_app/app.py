@@ -13,6 +13,7 @@ from urllib.parse import urlencode
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from flask import Flask, jsonify, redirect, request, send_file, send_from_directory, session
+import segno
 from webauthn import (
     base64url_to_bytes,
     generate_authentication_options,
@@ -189,6 +190,20 @@ def init_db() -> None:
             """
         )
 
+        # Cross-device QR approval table for secondary-device login flows
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cross_device_auth (
+                token TEXT PRIMARY KEY,
+                userid TEXT NOT NULL,
+                challenge_b64 TEXT,
+                expires_at TEXT NOT NULL,
+                verified INTEGER NOT NULL DEFAULT 0,
+                verified_at TEXT
+            )
+            """
+        )
+
         user_columns = {
             row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()
         }
@@ -293,12 +308,38 @@ def init_db() -> None:
                         row[6],
                     ),
                 )
+        # cross-device QR approval table
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cross_device_auth (
+                token TEXT PRIMARY KEY,
+                userid TEXT NOT NULL,
+                challenge_b64 TEXT,
+                expires_at TEXT NOT NULL,
+                verified INTEGER NOT NULL DEFAULT 0,
+                verified_at TEXT
+            )
+            """
+        )
 
 
 def db_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+@app.route("/__debug/db_info")
+def debug_db_info():
+    try:
+        exists = DB_PATH.exists()
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")]
+            pragma = [list(r) for r in c.execute("PRAGMA table_info('cross_device_auth')")]
+        return jsonify({"db_path": str(DB_PATH), "exists": bool(exists), "tables": tables, "cross_device_auth_schema": pragma})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 def build_url(path: str, **params: str) -> str:
@@ -1212,6 +1253,157 @@ def biometric_auth_verify():
     session["biometric_verified"] = True
     session.pop("biometric_challenge", None)
     return jsonify({"message": "Biometric verification completed.", "redirect": "/password.html"})
+
+
+@app.post('/api/biometric/qr_create')
+def biometric_qr_create():
+    userid = session.get('pending_user_id')
+    if not userid:
+        return jsonify({'error': 'Start login first.'}), 401
+
+    with db_connection() as conn:
+        user = conn.execute('SELECT webauthn_credential_id FROM users WHERE userid = ?', (userid,)).fetchone()
+        if not user or not user['webauthn_credential_id']:
+            return jsonify({'error': 'Biometric not configured for this account.'}), 400
+
+    token = encode_base64url(os.urandom(18))
+    expires_in = 300
+    expires_at = (now_utc() + timedelta(seconds=expires_in)).isoformat()
+    consume_url = f"/biometric/qr/{token}"
+    qr_payload = f"{request.host_url.rstrip('/')}{consume_url}"
+    # QR color configuration: dark = foreground, light = background
+    qr_dark = os.environ.get("QR_DARK_COLOR", "#0033AA")
+    qr_light = os.environ.get("QR_LIGHT_COLOR", "#FFFFFF")
+    qr = segno.make(qr_payload, error='m')
+    qr_buffer = io.BytesIO()
+    qr.save(
+        qr_buffer,
+        kind='svg',
+        xmldecl=False,
+        border=2,
+        scale=6,
+        dark=qr_dark,
+        light=qr_light,
+    )
+    qr_image = 'data:image/svg+xml;base64,' + base64.b64encode(qr_buffer.getvalue()).decode('ascii')
+
+    with db_connection() as conn:
+        conn.execute(
+            'INSERT INTO cross_device_auth (token, userid, expires_at, verified) VALUES (?, ?, ?, 0)',
+            (token, userid, expires_at),
+        )
+
+    return jsonify({
+        'token': token,
+        'consume_url': consume_url,
+        'qr_image': qr_image,
+        'expires_in': expires_in,
+    })
+
+
+@app.get('/api/biometric/qr_status')
+def biometric_qr_status():
+    token = (request.args.get('token') or '').strip()
+    if not token:
+        return jsonify({'error': 'Token required.'}), 400
+
+    with db_connection() as conn:
+        row = conn.execute('SELECT userid, expires_at, verified FROM cross_device_auth WHERE token = ?', (token,)).fetchone()
+    if not row:
+        return jsonify({'error': 'Not found.'}), 404
+
+    expired = parse_utc(row['expires_at']) < now_utc()
+    return jsonify({'verified': bool(row['verified']), 'expired': bool(expired), 'redirect': '/password.html' if row['verified'] else None})
+
+
+@app.get('/biometric/qr/<token>')
+def biometric_qr_consumer(token):
+    # Serve a small verification page for the registered device to complete verification
+    response = send_from_directory(TEMPLATES_DIR, 'biometric_qr.html')
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
+@app.post('/api/biometric/qr/<token>/options')
+def biometric_qr_token_options(token):
+    userid = session_user()
+    if not userid:
+        return jsonify({'error': 'Sign in on this device to approve the request.'}), 401
+
+    with db_connection() as conn:
+        row = conn.execute('SELECT userid, expires_at, verified FROM cross_device_auth WHERE token = ?', (token,)).fetchone()
+        if not row:
+            return jsonify({'error': 'Not found.'}), 404
+        if row['userid'] != userid:
+            return jsonify({'error': 'This QR is not for your account.'}), 403
+        if parse_utc(row['expires_at']) < now_utc():
+            return jsonify({'error': 'Token expired.'}), 410
+        if row['verified']:
+            return jsonify({'error': 'Already verified.'}), 400
+
+        user = conn.execute('SELECT webauthn_credential_id FROM users WHERE userid = ?', (userid,)).fetchone()
+        if not user or not user['webauthn_credential_id']:
+            return jsonify({'error': 'Biometric not configured.'}), 400
+
+        options = generate_authentication_options(
+            rp_id=relying_party_id(),
+            allow_credentials=[
+                PublicKeyCredentialDescriptor(
+                    id=base64url_to_bytes(str(user['webauthn_credential_id'])),
+                )
+            ],
+            user_verification=UserVerificationRequirement.REQUIRED,
+        )
+
+        # persist challenge for verification
+        conn.execute('UPDATE cross_device_auth SET challenge_b64 = ? WHERE token = ?', (encode_base64url(options.challenge), token))
+        return jsonify(json.loads(options_to_json(options)))
+
+
+@app.post('/api/biometric/qr/<token>/verify')
+def biometric_qr_token_verify(token):
+    userid = session_user()
+    if not userid:
+        return jsonify({'error': 'Sign in on this device to approve the request.'}), 401
+
+    payload = request.get_json(silent=True) or {}
+    credential = payload.get('credential')
+    if not credential:
+        return jsonify({'error': 'Missing credential payload.'}), 400
+
+    with db_connection() as conn:
+        row = conn.execute('SELECT userid, expires_at, verified, challenge_b64 FROM cross_device_auth WHERE token = ?', (token,)).fetchone()
+        if not row:
+            return jsonify({'error': 'Not found.'}), 404
+        if row['userid'] != userid:
+            return jsonify({'error': 'This QR is not for your account.'}), 403
+        if parse_utc(row['expires_at']) < now_utc():
+            return jsonify({'error': 'Token expired.'}), 410
+        if row['verified']:
+            return jsonify({'error': 'Already verified.'}), 400
+
+        user = conn.execute('SELECT webauthn_public_key, webauthn_sign_count FROM users WHERE userid = ?', (userid,)).fetchone()
+        if not user or not user['webauthn_public_key']:
+            return jsonify({'error': 'Biometric not configured.'}), 400
+
+        try:
+            verification = verify_authentication_response(
+                credential=credential,
+                expected_challenge=base64url_to_bytes(row['challenge_b64']),
+                expected_rp_id=relying_party_id(),
+                expected_origin=expected_origin(),
+                credential_public_key=base64url_to_bytes(str(user['webauthn_public_key'])),
+                credential_current_sign_count=int(user['webauthn_sign_count'] or 0),
+                require_user_verification=True,
+            )
+        except Exception:
+            return jsonify({'error': 'Biometric verification failed.'}), 403
+
+        # update counters and mark verified
+        conn.execute('UPDATE users SET webauthn_sign_count = ? WHERE userid = ?', (int(verification.new_sign_count), userid))
+        conn.execute('UPDATE cross_device_auth SET verified = 1, verified_at = ? WHERE token = ?', (now_utc().isoformat(), token))
+
+    return jsonify({'message': 'Verified', 'redirect': '/password.html'})
 
 
 @app.get("/password.html")

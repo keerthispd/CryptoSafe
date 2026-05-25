@@ -5,3 +5,4 @@ bcrypt==4.0.1
 pyjwt==2.8.0    
 gunicorn==23.0.0
 Werkzeug
+segno==1.6.6
