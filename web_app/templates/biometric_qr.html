@@ -16,7 +16,7 @@
     <h1>Complete biometric verification</h1>
     <p class="meta">Approve biometric (fingerprint/face) on this device to complete sign-in on the other device.</p>
     <div id="status" style="margin:12px 0;color:#fda4af"></div>
-    <button id="start">Start biometric on this device</button>
+    <button id="start">Open biometric prompt</button>
   </div>
 
   <script>
@@ -36,6 +36,7 @@
         const options=optsJson;
         options.challenge=base64urlToArrayBuffer(options.challenge);
         options.allowCredentials=(Array.isArray(options.allowCredentials)?options.allowCredentials:[]).map(item=>({...item,id:base64urlToArrayBuffer(String(item.id))}));
+        statusEl.textContent='Waiting for fingerprint / face prompt...';
         const assertion=await navigator.credentials.get({ publicKey: options });
         if(!assertion){ statusEl.textContent='Cancelled.'; return; }
         const credential={ id: assertion.id, rawId: bufferToBase64url(assertion.rawId), type: assertion.type, response: { authenticatorData: bufferToBase64url(assertion.response.authenticatorData), clientDataJSON: bufferToBase64url(assertion.response.clientDataJSON), signature: bufferToBase64url(assertion.response.signature), userHandle: assertion.response.userHandle?bufferToBase64url(assertion.response.userHandle):null }, clientExtensionResults: assertion.getClientExtensionResults() };

@@ -35,7 +35,7 @@ from werkzeug.utils import secure_filename
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"
-DB_PATH = BASE_DIR / "cryptosafe.db"
+DB_PATH = Path(os.environ.get("DATABASE_PATH", str(BASE_DIR / "cryptosafe.db")))
 LOCKOUT_DURATION = timedelta(hours=24)
 MAX_FAILED_ATTEMPTS = 3
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -143,6 +143,7 @@ def decrypt_bytes(encoded_payload: str) -> bytes:
 
 
 def init_db() -> None:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
             """
@@ -324,6 +325,7 @@ def init_db() -> None:
 
 
 def db_connection() -> sqlite3.Connection:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
@@ -1326,22 +1328,16 @@ def biometric_qr_consumer(token):
 
 @app.post('/api/biometric/qr/<token>/options')
 def biometric_qr_token_options(token):
-    userid = session_user()
-    if not userid:
-        return jsonify({'error': 'Sign in on this device to approve the request.'}), 401
-
     with db_connection() as conn:
         row = conn.execute('SELECT userid, expires_at, verified FROM cross_device_auth WHERE token = ?', (token,)).fetchone()
         if not row:
             return jsonify({'error': 'Not found.'}), 404
-        if row['userid'] != userid:
-            return jsonify({'error': 'This QR is not for your account.'}), 403
         if parse_utc(row['expires_at']) < now_utc():
             return jsonify({'error': 'Token expired.'}), 410
         if row['verified']:
             return jsonify({'error': 'Already verified.'}), 400
 
-        user = conn.execute('SELECT webauthn_credential_id FROM users WHERE userid = ?', (userid,)).fetchone()
+        user = conn.execute('SELECT webauthn_credential_id FROM users WHERE userid = ?', (row['userid'],)).fetchone()
         if not user or not user['webauthn_credential_id']:
             return jsonify({'error': 'Biometric not configured.'}), 400
 
@@ -1362,10 +1358,6 @@ def biometric_qr_token_options(token):
 
 @app.post('/api/biometric/qr/<token>/verify')
 def biometric_qr_token_verify(token):
-    userid = session_user()
-    if not userid:
-        return jsonify({'error': 'Sign in on this device to approve the request.'}), 401
-
     payload = request.get_json(silent=True) or {}
     credential = payload.get('credential')
     if not credential:
@@ -1375,14 +1367,12 @@ def biometric_qr_token_verify(token):
         row = conn.execute('SELECT userid, expires_at, verified, challenge_b64 FROM cross_device_auth WHERE token = ?', (token,)).fetchone()
         if not row:
             return jsonify({'error': 'Not found.'}), 404
-        if row['userid'] != userid:
-            return jsonify({'error': 'This QR is not for your account.'}), 403
         if parse_utc(row['expires_at']) < now_utc():
             return jsonify({'error': 'Token expired.'}), 410
         if row['verified']:
             return jsonify({'error': 'Already verified.'}), 400
 
-        user = conn.execute('SELECT webauthn_public_key, webauthn_sign_count FROM users WHERE userid = ?', (userid,)).fetchone()
+        user = conn.execute('SELECT webauthn_public_key, webauthn_sign_count FROM users WHERE userid = ?', (row['userid'],)).fetchone()
         if not user or not user['webauthn_public_key']:
             return jsonify({'error': 'Biometric not configured.'}), 400
 
@@ -1400,7 +1390,7 @@ def biometric_qr_token_verify(token):
             return jsonify({'error': 'Biometric verification failed.'}), 403
 
         # update counters and mark verified
-        conn.execute('UPDATE users SET webauthn_sign_count = ? WHERE userid = ?', (int(verification.new_sign_count), userid))
+        conn.execute('UPDATE users SET webauthn_sign_count = ? WHERE userid = ?', (int(verification.new_sign_count), row['userid']))
         conn.execute('UPDATE cross_device_auth SET verified = 1, verified_at = ? WHERE token = ?', (now_utc().isoformat(), token))
 
     return jsonify({'message': 'Verified', 'redirect': '/password.html'})
@@ -2352,4 +2342,8 @@ print("Serving from:", BASE_DIR)
 
 if __name__ == "__main__":
     init_db()
-    app.run(debug=True, host="localhost", port=5000)
+    app.run(
+        debug=os.environ.get("FLASK_DEBUG", "1").strip().lower() in {"1", "true", "yes", "on"},
+        host=os.environ.get("HOST", "0.0.0.0"),
+        port=int(os.environ.get("PORT", "5000")),
+    )

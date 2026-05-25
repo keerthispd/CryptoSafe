@@ -1,21 +1,21 @@
 from __future__ import annotations
 
-import subprocess
+import os
 from pathlib import Path
+
+from web_app.app import app, init_db
 
 
 def main() -> int:
     repo_root = Path(__file__).resolve().parent
-    venv_python = repo_root / ".venv" / "Scripts" / "python.exe"
-    target_app = repo_root / "web_app" / "app.py"
-
-    if venv_python.exists():
-        completed = subprocess.run([str(venv_python), str(target_app)])
-        return completed.returncode
-
-    print(f"Virtual environment Python not found at {venv_python}")
-    print("Run the app with an activated virtual environment or recreate .venv.")
-    return 1
+    print(f"Serving from: {repo_root / 'web_app'}")
+    init_db()
+    app.run(
+        debug=os.environ.get("FLASK_DEBUG", "1").strip().lower() in {"1", "true", "yes", "on"},
+        host=os.environ.get("HOST", "0.0.0.0"),
+        port=int(os.environ.get("PORT", "5000")),
+    )
+    return 0
 
 
 if __name__ == "__main__":
