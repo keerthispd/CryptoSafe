@@ -406,12 +406,18 @@ def relying_party_id() -> str:
     return host
 
 
-def expected_origin() -> str:
+'''def expected_origin() -> str:
     origin = request.host_url.rstrip("/")
     if "127.0.0.1" in origin:
         origin = origin.replace("127.0.0.1", "localhost")
-    return origin
+    return origin'''
+def expected_origin() -> str:
+    scheme = request.headers.get(
+        "X-Forwarded-Proto",
+        request.scheme
+    )
 
+    return f"{scheme}://{relying_party_id()}"
 
 def uploaded_file_from_request(field_name: str = "upload_file"):
     uploaded = request.files.get(field_name)
