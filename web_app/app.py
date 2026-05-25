@@ -4,6 +4,7 @@ import base64
 import hashlib
 import io
 import json
+import mimetypes
 import os
 import re
 import sqlite3
@@ -31,6 +32,7 @@ from webauthn.helpers.structs import (
 )
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -88,6 +90,7 @@ ALLOWED_UPLOAD_MIME_TYPES = {
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 
 def _key_from_env_or_secret() -> bytes:
@@ -376,7 +379,10 @@ def now_utc() -> datetime:
 def parse_utc(value: str | None) -> datetime | None:
     if not value:
         return None
-    return datetime.fromisoformat(value)
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def session_user() -> str | None:
@@ -468,7 +474,7 @@ def fetch_file_attachments(conn: sqlite3.Connection, file_id: int, userid: str) 
         {
             "attachment_id": row["id"],
             "uploaded_file_name": row["uploaded_file_name"] or "vault-file",
-            "uploaded_file_mime": row["uploaded_file_mime"] or "application/octet-stream",
+            "uploaded_file_mime": infer_mime_type(row["uploaded_file_name"] or "", row["uploaded_file_mime"]),
             "uploaded_file_size": int(row["uploaded_file_size"] or 0),
             "uploaded_file_encrypted": row["uploaded_file_encrypted"] or "",
             "created_at": row["created_at"],
@@ -492,7 +498,10 @@ def fetch_file_attachments(conn: sqlite3.Connection, file_id: int, userid: str) 
             {
                 "attachment_id": None,
                 "uploaded_file_name": legacy_row["uploaded_file_name"] or "vault-file",
-                "uploaded_file_mime": legacy_row["uploaded_file_mime"] or "application/octet-stream",
+                "uploaded_file_mime": infer_mime_type(
+                    legacy_row["uploaded_file_name"] or "",
+                    legacy_row["uploaded_file_mime"],
+                ),
                 "uploaded_file_size": int(legacy_row["uploaded_file_size"] or 0),
                 "uploaded_file_encrypted": legacy_row["uploaded_file_encrypted"] or "",
                 "created_at": legacy_row["created_at"],
@@ -611,6 +620,39 @@ def validate_uploaded_file(filename: str, mime_type: str, size_bytes: int) -> st
     if size_bytes > MAX_UPLOAD_BYTES:
         return "Uploaded file is too large (max 10 MB)."
     return None
+
+
+def infer_mime_type(filename: str, mime_type: str | None = None) -> str:
+    normalized_mime = (mime_type or "").strip().lower()
+    if normalized_mime and normalized_mime != "application/octet-stream":
+        return normalized_mime
+
+    guessed_mime, _ = mimetypes.guess_type(filename or "")
+    if guessed_mime:
+        return guessed_mime
+
+    return "application/octet-stream"
+
+
+def apply_biometric_failure(conn: sqlite3.Connection, userid: str, current_failed_attempts: int | None) -> tuple[int, str | None]:
+    failed_attempts = int(current_failed_attempts or 0) + 1
+    lock_until_value = None
+    if failed_attempts >= MAX_FAILED_ATTEMPTS:
+        lock_until_value = (now_utc() + LOCKOUT_DURATION).isoformat()
+        failed_attempts = MAX_FAILED_ATTEMPTS
+
+    conn.execute(
+        "UPDATE users SET biometric_failed_attempts = ?, biometric_locked_until = ?, biometric_last_failed_at = ? WHERE userid = ?",
+        (failed_attempts, lock_until_value, now_utc().isoformat(), userid),
+    )
+    return failed_attempts, lock_until_value
+
+
+def clear_biometric_lockout(conn: sqlite3.Connection, userid: str) -> None:
+    conn.execute(
+        "UPDATE users SET biometric_failed_attempts = 0, biometric_locked_until = NULL, biometric_last_failed_at = NULL WHERE userid = ?",
+        (userid,),
+    )
 
 
 def verify_user_password(userid: str, password: str) -> bool:
@@ -1200,24 +1242,11 @@ def biometric_auth_verify():
                 return jsonify({"error": "Passcode not configured for this account."}), 400
 
             if not check_password_hash(stored["passcode_hash"], passcode):
-                # increment biometric failures
-                current = int(stored["biometric_failed_attempts"] or 0) + 1
-                lock_until_val = None
-                if current >= MAX_FAILED_ATTEMPTS:
-                    lock_until = now_utc() + LOCKOUT_DURATION
-                    lock_until_val = lock_until.isoformat()
-                    current = MAX_FAILED_ATTEMPTS
-                conn.execute(
-                    "UPDATE users SET biometric_failed_attempts = ?, biometric_locked_until = ?, biometric_last_failed_at = ? WHERE userid = ?",
-                    (current, lock_until_val, now_utc().isoformat(), userid),
-                )
+                apply_biometric_failure(conn, userid, stored["biometric_failed_attempts"])
                 return jsonify({"error": "Passcode verification failed."}), 403
 
             # success
-            conn.execute(
-                "UPDATE users SET biometric_failed_attempts = 0, biometric_locked_until = NULL, biometric_last_failed_at = NULL WHERE userid = ?",
-                (userid,),
-            )
+            clear_biometric_lockout(conn, userid)
             session["biometric_verified"] = True
             return jsonify({"message": "Biometric/passcode verification completed.", "redirect": "/password.html"})
 
@@ -1239,24 +1268,12 @@ def biometric_auth_verify():
                 require_user_verification=True,
             )
         except Exception:
-            # increment biometric failure counter
-            current_fail = int(user["biometric_failed_attempts"] or 0) + 1
-            lock_until_val = None
-            if current_fail >= MAX_FAILED_ATTEMPTS:
-                lock_until = now_utc() + LOCKOUT_DURATION
-                lock_until_val = lock_until.isoformat()
-                current_fail = MAX_FAILED_ATTEMPTS
-            conn.execute(
-                "UPDATE users SET biometric_failed_attempts = ?, biometric_locked_until = ?, biometric_last_failed_at = ? WHERE userid = ?",
-                (current_fail, lock_until_val, now_utc().isoformat(), userid),
-            )
+            apply_biometric_failure(conn, userid, user["biometric_failed_attempts"])
             return jsonify({"error": "Biometric verification failed."}), 403
 
         # success: reset biometric counters and mark verified for password phase
-        conn.execute(
-            "UPDATE users SET webauthn_sign_count = ?, biometric_failed_attempts = 0, biometric_locked_until = NULL, biometric_last_failed_at = NULL WHERE userid = ?",
-            (int(verification.new_sign_count), userid),
-        )
+        conn.execute("UPDATE users SET webauthn_sign_count = ? WHERE userid = ?", (int(verification.new_sign_count), userid))
+        clear_biometric_lockout(conn, userid)
 
     session["biometric_verified"] = True
     session.pop("biometric_challenge", None)
@@ -1343,9 +1360,13 @@ def biometric_qr_token_options(token):
         if row['verified']:
             return jsonify({'error': 'Already verified.'}), 400
 
-        user = conn.execute('SELECT webauthn_credential_id FROM users WHERE userid = ?', (row['userid'],)).fetchone()
+        user = conn.execute('SELECT webauthn_credential_id, biometric_locked_until FROM users WHERE userid = ?', (row['userid'],)).fetchone()
         if not user or not user['webauthn_credential_id']:
             return jsonify({'error': 'Biometric not configured.'}), 400
+
+        locked_until = parse_utc(user['biometric_locked_until']) if user['biometric_locked_until'] else None
+        if locked_until and locked_until > now_utc():
+            return jsonify({'error': 'Biometric locked due to repeated failures.'}), 403
 
         options = generate_authentication_options(
             rp_id=relying_party_id(),
@@ -1378,7 +1399,7 @@ def biometric_qr_token_verify(token):
         if row['verified']:
             return jsonify({'error': 'Already verified.'}), 400
 
-        user = conn.execute('SELECT webauthn_public_key, webauthn_sign_count FROM users WHERE userid = ?', (row['userid'],)).fetchone()
+        user = conn.execute('SELECT webauthn_public_key, webauthn_sign_count, biometric_failed_attempts FROM users WHERE userid = ?', (row['userid'],)).fetchone()
         if not user or not user['webauthn_public_key']:
             return jsonify({'error': 'Biometric not configured.'}), 400
 
@@ -1393,11 +1414,16 @@ def biometric_qr_token_verify(token):
                 require_user_verification=True,
             )
         except Exception:
+            apply_biometric_failure(conn, row['userid'], user['biometric_failed_attempts'])
             return jsonify({'error': 'Biometric verification failed.'}), 403
 
         # update counters and mark verified
         conn.execute('UPDATE users SET webauthn_sign_count = ? WHERE userid = ?', (int(verification.new_sign_count), row['userid']))
+        clear_biometric_lockout(conn, row['userid'])
         conn.execute('UPDATE cross_device_auth SET verified = 1, verified_at = ? WHERE token = ?', (now_utc().isoformat(), token))
+
+    session['pending_user_id'] = row['userid']
+    session['biometric_verified'] = True
 
     return jsonify({'message': 'Verified', 'redirect': '/password.html'})
 
@@ -2009,7 +2035,7 @@ def download_user_file(file_id: int):
         return jsonify({"error": "Unable to decrypt stored file."}), 500
 
     download_name = attachment["uploaded_file_name"] or "vault-file"
-    mime_type = attachment["uploaded_file_mime"] or "application/octet-stream"
+    mime_type = infer_mime_type(attachment["uploaded_file_name"] or "", attachment["uploaded_file_mime"])
     return send_file(
         io.BytesIO(plain_bytes),
         mimetype=mime_type,
@@ -2076,7 +2102,7 @@ def get_user_file_attachment(file_id: int):
     except Exception:
         return jsonify({"error": "Unable to decrypt stored file."}), 500
 
-    mime_type = attachment["uploaded_file_mime"] or "application/octet-stream"
+    mime_type = infer_mime_type(attachment["uploaded_file_name"] or "", attachment["uploaded_file_mime"])
     return jsonify(
         {
             "uploaded_file_name": attachment["uploaded_file_name"] or "vault-file",

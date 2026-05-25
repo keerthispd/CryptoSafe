@@ -267,6 +267,28 @@
       padding-right: 44px;
     }
 
+    .attachment-kind-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      background: rgba(56, 189, 248, 0.14);
+      border: 1px solid rgba(56, 189, 248, 0.24);
+      color: #d8f3ff;
+      font-size: 0.72rem;
+      line-height: 1;
+      font-weight: 700;
+    }
+
+    .attachment-kind-icon.audio {
+      background: rgba(110, 231, 183, 0.14);
+      border-color: rgba(110, 231, 183, 0.24);
+      color: #d9ffee;
+    }
+
     .attachment-badge {
       position: absolute;
       top: 12px;
@@ -810,6 +832,18 @@
       return `${size.toFixed(size >= 10 || idx === 0 ? 1 : 2)} ${units[idx]}`;
     }
 
+    function inferPreviewMime(name, fallbackMime) {
+      const mime = String(fallbackMime || '').toLowerCase().trim();
+      if (mime && mime !== 'application/octet-stream') return mime;
+      const fileName = String(name || '').toLowerCase();
+      const match = fileName.match(/\.([a-z0-9]+)$/);
+      const ext = match ? match[1] : '';
+      if (['mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac', 'mp4', 'webm'].includes(ext)) return 'audio/' + (ext === 'mp3' ? 'mpeg' : ext === 'm4a' ? 'mp4' : ext);
+      if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) return 'image/' + (ext === 'jpg' ? 'jpeg' : ext === 'jpeg' ? 'jpeg' : ext === 'svg' ? 'svg+xml' : ext);
+      if (ext === 'pdf') return 'application/pdf';
+      return mime || 'application/octet-stream';
+    }
+
     function updateDeleteSelectedButton() {
       deleteSelectedBtn.style.display = selectedDeleteIds.size ? "inline-block" : "none";
       deleteSelectedBtn.textContent = selectedDeleteIds.size ? `Delete selected (${selectedDeleteIds.size})` : "Delete selected";
@@ -860,17 +894,27 @@
         const fileName = String(attachment.uploaded_file_name || '').toLowerCase();
         const match = fileName.match(/\.([a-z0-9]+)$/);
         const ext = match ? match[1] : '';
+        const isAudio = ['mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac'].includes(ext);
         const themeClass = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(ext)
           ? 'badge--accent'
           : ['pdf'].includes(ext)
             ? 'badge--rose'
-            : ['mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac'].includes(ext)
+            : isAudio
               ? 'badge--sky'
               : ['txt', 'rtf', 'csv', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)
                 ? 'badge--muted'
                 : 'badge--sky';
         badge.classList.add(themeClass);
         badge.textContent = ext ? ext.toUpperCase().slice(0, 6) : 'FILE';
+
+        if (isAudio) {
+          const audioIcon = document.createElement('span');
+          audioIcon.className = 'attachment-kind-icon audio';
+          audioIcon.title = 'Audio file';
+          audioIcon.setAttribute('aria-label', 'Audio file');
+          audioIcon.textContent = '♪';
+          top.append(audioIcon);
+        }
 
         // inline thumbnail for image file names (small heuristic by extension)
         const fname = (attachment.uploaded_file_name || '').toLowerCase();
@@ -981,7 +1025,7 @@
 
     function showPreview(blob, name) {
       clearPreview();
-      const mime = blob.type || '';
+      const mime = inferPreviewMime(name, blob.type || '');
       _previewUrl = URL.createObjectURL(blob);
       previewTitle.textContent = name || 'Preview';
       if (mime.startsWith('image/')) {
