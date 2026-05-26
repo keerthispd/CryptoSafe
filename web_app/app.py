@@ -2424,6 +2424,40 @@ def users():
 
     return [dict(row) for row in rows]
 
+@app.route("/database-view")
+def database_view():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+
+        users = conn.execute("""
+            SELECT userid,password_hash,created_at
+            FROM users
+        """).fetchall()
+
+    html = """
+    <h2>CryptoSafe Database Contents</h2>
+
+    <table border="1" cellpadding="10">
+        <tr>
+            <th>User ID</th>
+            <th>Password Hash</th>
+            <th>Created</th>
+        </tr>
+    """
+
+    for row in users:
+        html += f"""
+        <tr>
+            <td>{row['userid']}</td>
+            <td>{row['password_hash']}</td>
+            <td>{row['created_at']}</td>
+        </tr>
+        """
+
+    html += "</table>"
+
+    return html
+
 if __name__ == "__main__":
     init_db()
     app.run(
