@@ -521,8 +521,8 @@
 				return;
 			}
 			if (method === 'passcode') {
-				if (!passcodeInput.value || passcodeInput.value !== passcodeConfirmInput.value || passcodeInput.value.length < 4) {
-					showInlineError('Passcode required, must match, and be at least 4 characters.');
+				if (!passcodeInput.value || passcodeInput.value !== passcodeConfirmInput.value || passcodeInput.value.length < 4 || !/^[0-9]+$/.test(passcodeInput.value)) {
+					showInlineError('Passcode required, must match, be at least 4 digits, and contain only numbers.');
 					return;
 				}
 				form.submit();

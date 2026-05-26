@@ -121,6 +121,56 @@
       flex-wrap: wrap;
     }
 
+    .qr-shell {
+      margin-top: 18px;
+      padding: 18px;
+      border-radius: 16px;
+      border: 1px solid rgba(166, 180, 194, 0.12);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .qr-shell.hidden {
+      display: none;
+    }
+
+    .qr-grid {
+      display: grid;
+      grid-template-columns: minmax(180px, 220px) 1fr;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .qr-image {
+      width: 100%;
+      max-width: 220px;
+      aspect-ratio: 1 / 1;
+      border-radius: 18px;
+      background: #fff;
+      padding: 10px;
+    }
+
+    .qr-copy h3 {
+      margin: 0 0 8px;
+      font-size: 1.15rem;
+    }
+
+    .qr-copy p {
+      margin-bottom: 10px;
+    }
+
+    .qr-copy .small {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .qr-copy .mini-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
     /* option cards */
     .option-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap:12px; margin-top:12px }
     .option-card { background: rgba(255,255,255,0.03); border:1px solid rgba(166,180,194,0.08); padding:12px; border-radius:12px; cursor:pointer; display:flex; gap:12px; align-items:center }
@@ -260,6 +310,12 @@
               try { await beginBiometricVerification(info); } catch (e) { showError(e.message); card.querySelector('h3').textContent = 'Device biometric (passkey)'; }
             });
             grid.appendChild(card);
+
+            const card3 = document.createElement('div');
+            card3.className = 'option-card';
+            card3.innerHTML = `<div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3.5" y="3.5" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.4"/><rect x="15.5" y="3.5" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.4"/><rect x="3.5" y="15.5" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.4"/><path d="M11 5h2M11 9h2M11 13h2M11 17h2M17 11h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></div><div style="flex:1"><h3>Scan QR from another device</h3><div class="meta">Use a second device to approve biometrics, then return here for password verification.</div></div>`;
+            card3.addEventListener('click', () => renderQrFlow());
+            grid.appendChild(card3);
           }
 
           if (info.passcode) {
@@ -299,6 +355,90 @@
       });
       const back = document.createElement('a'); back.href='/login.html'; back.className='link'; back.textContent='Back to login';
       container.appendChild(input); container.appendChild(submit); container.appendChild(back);
+    }
+
+    function renderQrFlow() {
+      const container = document.querySelector('.actions');
+      container.innerHTML = '';
+
+      const shell = document.createElement('div');
+      shell.className = 'qr-shell';
+      shell.innerHTML = `
+        <div class="qr-grid">
+          <img id="qrImage" class="qr-image" alt="QR code for cross-device login" />
+          <div class="qr-copy">
+            <h3>Scan this QR on the biometric device</h3>
+            <p>Open the QR with the device that has fingerprint or face unlock, approve the biometric prompt there, then return here automatically for password verification.</p>
+            <div id="qrStatus" class="small">Preparing QR...</div>
+            <div class="mini-actions">
+              <a id="qrOpenLink" class="link" href="#" target="_blank" rel="noopener">Open QR link</a>
+              <a class="link" href="/login.html">Back to login</a>
+            </div>
+          </div>
+        </div>
+      `;
+
+      container.appendChild(shell);
+
+      const qrImage = shell.querySelector('#qrImage');
+      const qrStatus = shell.querySelector('#qrStatus');
+      const qrOpenLink = shell.querySelector('#qrOpenLink');
+      let pollTimer = null;
+
+      const stopPolling = () => {
+        if (pollTimer) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+        }
+      };
+
+      const pollStatus = async (token) => {
+        const statusResponse = await fetch(`/api/biometric/qr_status?token=${encodeURIComponent(token)}`);
+        const statusData = await statusResponse.json();
+        if (!statusResponse.ok) {
+          throw new Error(statusData.error || 'Unable to read QR status.');
+        }
+
+        if (statusData.expired) {
+          stopPolling();
+          qrStatus.textContent = 'QR expired. Please generate a new one.';
+          return;
+        }
+
+        if (statusData.verified && statusData.redirect) {
+          stopPolling();
+          qrStatus.textContent = 'Biometric approved. Continuing on this device...';
+          window.location.href = statusData.redirect;
+          return;
+        }
+
+        qrStatus.textContent = 'Waiting for biometric approval on the other device...';
+      };
+
+      (async () => {
+        try {
+          const response = await fetch('/api/biometric/qr_create', { method: 'POST' });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || 'Unable to create QR code.');
+          }
+
+          qrImage.src = data.qr_image;
+          qrOpenLink.href = data.consume_url;
+          qrStatus.textContent = 'Scan the QR code with your biometric device.';
+
+          await pollStatus(data.token);
+          pollTimer = setInterval(() => {
+            pollStatus(data.token).catch((error) => {
+              stopPolling();
+              qrStatus.textContent = error.message || 'Unable to check QR status.';
+            });
+          }, 2000);
+        } catch (error) {
+          qrStatus.textContent = error.message || 'Unable to create QR code.';
+          showError(error.message || 'Unable to create QR code.');
+        }
+      })();
     }
 
     init();
