@@ -37,7 +37,24 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"
-DB_PATH = Path(os.environ.get("DATABASE_PATH", str(BASE_DIR / "cryptosafe.db")))
+
+
+def resolve_database_path() -> Path:
+    explicit_path = os.environ.get("DATABASE_PATH", "").strip()
+    if explicit_path:
+        return Path(explicit_path)
+
+    render_disk_path = os.environ.get("RENDER_DISK_PATH", "").strip()
+    if render_disk_path:
+        return Path(render_disk_path) / "cryptosafe.db"
+
+    if os.environ.get("RENDER", "").strip():
+        return Path("/opt/render/project/src/data/cryptosafe.db")
+
+    return BASE_DIR / "cryptosafe.db"
+
+
+DB_PATH = resolve_database_path()
 LOCKOUT_DURATION = timedelta(hours=24)
 MAX_FAILED_ATTEMPTS = 3
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -90,6 +107,7 @@ ALLOWED_UPLOAD_MIME_TYPES = {
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
+app.config["DATABASE_PATH"] = str(DB_PATH)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 

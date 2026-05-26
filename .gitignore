@@ -1,1 +1,18 @@
+# Python
 __pycache__/
+*.pyc
+
+# Virtual environments
+venv/
+.venv/
+
+# Database
+cryptosafe.db
+data/
+
+# Environment variables
+.env
+
+#currently empty, but may be used in the future for other files that should be ignored
+docs/
+mobile_app/

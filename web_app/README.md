@@ -41,8 +41,9 @@ This demo now uses Flask + SQLite for registration.
 
 ### Deployment Notes
 - The app writes to `DATABASE_PATH` when that environment variable is set.
-- For Render or any other redeploying host, mount persistent storage and point `DATABASE_PATH` at that mounted SQLite file.
-- If `DATABASE_PATH` is not set, the app falls back to `web_app/cryptosafe.db`, which will be recreated when the container restarts.
+- On Render, set a persistent disk and point `DATABASE_PATH` to that mounted path, for example `/opt/render/project/src/data/cryptosafe.db`.
+- If `DATABASE_PATH` is not set, the app falls back to a local SQLite file for development, and that file will be recreated when the container restarts.
+- You can also set `RENDER_DISK_PATH` to the mounted folder, and the app will use `<mounted-folder>/cryptosafe.db` automatically.
 - Set the same `DATABASE_PATH` value before running the inspection or wipe scripts so they target the same database file as the app.
 
 ### Biometric Notes
