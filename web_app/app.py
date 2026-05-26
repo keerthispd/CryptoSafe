@@ -2394,6 +2394,18 @@ def delete_account():
 
 print("Serving from:", BASE_DIR)
 
+#for checking existing users in DB (not exposed in production)
+@app.route("/users")
+def users():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+
+        rows = conn.execute(
+            "SELECT * FROM users"
+        ).fetchall()
+
+    return [dict(row) for row in rows]
+
 if __name__ == "__main__":
     init_db()
     app.run(
