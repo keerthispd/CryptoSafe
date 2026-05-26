@@ -300,44 +300,6 @@
 					</div>
 				</div>
 
-				<div class="field">
-					<label>Preferred biometric modality (hint)</label>
-					<div class="auth-grid">
-						<div class="option-card" data-value="auto">
-							<input type="radio" name="biometric_type" value="auto" checked />
-							<div class="icon" aria-hidden="true">
-								<!-- target/auto icon -->
-								<svg viewBox="0 0 24 24" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.4"/><path d="M12 2v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M12 20v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M2 12h2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M20 12h2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-							</div>
-							<div>
-								<strong>Auto</strong>
-								<div class="meta">Use the best available biometric on your device.</div>
-							</div>
-						</div>
-						<div class="option-card" data-value="fingerprint">
-							<input type="radio" name="biometric_type" value="fingerprint" />
-							<div class="icon" aria-hidden="true">
-								<svg viewBox="0 0 24 24" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 4.5l-1.5 2.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 4.5l1.5 2.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 10A7.5 7.5 0 0012 21a7.5 7.5 0 007.5-11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-							</div>
-							<div>
-								<strong>Fingerprint</strong>
-								<div class="meta">Prefer fingerprint if available.</div>
-							</div>
-						</div>
-						<div class="option-card" data-value="face">
-							<input type="radio" name="biometric_type" value="face" />
-							<div class="icon" aria-hidden="true">
-								<!-- face icon -->
-								<svg viewBox="0 0 24 24" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="2" stroke="currentColor" stroke-width="1.2"/><path d="M8 14c0-2 2-3.5 4-3.5s4 1.5 4 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-							</div>
-							<div>
-								<strong>Face ID</strong>
-								<div class="meta">Prefer face authentication if available.</div>
-							</div>
-						</div>
-					</div>
-					<p class="note">Note: browsers don't always expose modality; this is a hint and enrollment may still use the available authenticator.</p>
-				</div>
 				<div id="passcodeFields" style="display:none;">
 					<div class="field">
 						<label for="passcode">Passcode (4+ digits)</label>
