@@ -140,7 +140,7 @@
   <main class="panel">
     <div class="eyebrow">Security Phase</div>
     <h1>Verify biometrics to unlock your vault.</h1>
-    <p>Password verification is complete. Approve with your fingerprint, face ID, or device biometric prompt to continue.</p>
+    <p>Approve with your fingerprint, face ID, or device biometric prompt to continue.</p>
 
     <div id="status" class="status"></div>
 
@@ -260,37 +260,6 @@
               try { await beginBiometricVerification(info); } catch (e) { showError(e.message); card.querySelector('h3').textContent = 'Device biometric (passkey)'; }
             });
             grid.appendChild(card);
-
-            // Add explicit QR-scan option for secondary-device login
-            const qrCard = document.createElement('div');
-            qrCard.className = 'option-card';
-            qrCard.innerHTML = `<div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="6" height="6" stroke="currentColor" stroke-width="1.4"/><rect x="15" y="3" width="6" height="6" stroke="currentColor" stroke-width="1.4"/><rect x="3" y="15" width="6" height="6" stroke="currentColor" stroke-width="1.4"/><rect x="15" y="15" width="6" height="6" stroke="currentColor" stroke-width="1.4"/></svg></div><div style="flex:1"><h3>Scan QR on primary device</h3><div class="meta">If you're on a different device, scan this QR from your registered device to approve sign-in.</div></div>`;
-            qrCard.addEventListener('click', async () => {
-              qrCard.querySelector('h3').textContent = 'Creating QR…';
-              try{
-                const r = await fetch('/api/biometric/qr_create', { method: 'POST' });
-                const j = await r.json().catch(()=>null);
-                if(!r.ok || !j){ throw new Error((j && j.error) || 'Failed to create QR'); }
-                // show compact QR UI
-                let qrBox = document.getElementById('qrBox');
-                if(!qrBox){ qrBox = document.createElement('div'); qrBox.id = 'qrBox'; qrBox.style.marginTop = '12px'; }
-                qrBox.innerHTML = `<img src="${j.qr_image}" alt="QR code" style="width:160px;height:160px;border-radius:8px" /><div style="margin-top:8px"><a href="${j.consume_url}" target="_blank">Open on registered device</a></div><div id="qrStatusSmall" class="meta" style="margin-top:8px;color:var(--accent)"></div>`;
-                container.appendChild(qrBox);
-                qrCard.querySelector('h3').textContent = 'Polling...';
-                const token = j.token; const start = Date.now();
-                const poll = setInterval(async ()=>{
-                  try{
-                    const s = await fetch('/api/biometric/qr_status?token='+encodeURIComponent(token));
-                    const sj = await s.json();
-                    const statusEl = document.getElementById('qrStatusSmall');
-                    if(sj.expired){ statusEl.textContent = 'QR expired.'; clearInterval(poll); qrCard.querySelector('h3').textContent = 'Scan QR on primary device'; return; }
-                    if(sj.verified){ statusEl.textContent = 'Verified — continuing...'; clearInterval(poll); window.location = sj.redirect || '/password.html'; return; }
-                    if(Date.now() - start > (j.expires_in || 300)*1000){ statusEl.textContent='Timed out.'; clearInterval(poll); qrCard.querySelector('h3').textContent = 'Scan QR on primary device'; return; }
-                  }catch(err){ const statusEl = document.getElementById('qrStatusSmall'); if(statusEl) statusEl.textContent = 'Polling error'; clearInterval(poll); qrCard.querySelector('h3').textContent = 'Scan QR on primary device'; }
-                },2000);
-              }catch(e){ showError(e.message||String(e)); qrCard.querySelector('h3').textContent = 'Scan QR on primary device'; }
-            });
-            grid.appendChild(qrCard);
           }
 
           if (info.passcode) {
@@ -318,6 +287,9 @@
       const input = document.createElement('input');
       input.type = 'password';
       input.placeholder = 'Enter your passcode';
+      input.inputMode = 'numeric';
+      input.pattern = '[0-9]*';
+      input.autocomplete = 'one-time-code';
       input.style.padding = '10px'; input.style.borderRadius='8px'; input.style.border='1px solid rgba(166,180,194,0.12)'; input.style.width='100%';
       const submit = document.createElement('button');
       submit.textContent = 'Verify passcode';

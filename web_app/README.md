@@ -39,6 +39,12 @@ This demo now uses Flask + SQLite for registration.
 - `web_app/utils/` contains the database inspection and wipe scripts.
 - `web_app/cryptosafe.db` is the SQLite database file.
 
+### Deployment Notes
+- The app writes to `DATABASE_PATH` when that environment variable is set.
+- For Render or any other redeploying host, mount persistent storage and point `DATABASE_PATH` at that mounted SQLite file.
+- If `DATABASE_PATH` is not set, the app falls back to `web_app/cryptosafe.db`, which will be recreated when the container restarts.
+- Set the same `DATABASE_PATH` value before running the inspection or wipe scripts so they target the same database file as the app.
+
 ### Biometric Notes
 - A browser/device with WebAuthn passkey support is required for registration and login.
 - For local testing, use `localhost` or `127.0.0.1` consistently from registration through login.

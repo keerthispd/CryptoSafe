@@ -45,8 +45,7 @@
         const vj=await vres.json().catch(()=>null);
         if(!vres.ok){ statusEl.textContent=(vj&&vj.error)||'Verification failed'; return; }
         statusEl.style.color='var(--success, #5eead4)';
-        statusEl.textContent='Verified — moving to password step...';
-        window.location.href = (vj && vj.redirect) || '/password.html';
+        statusEl.textContent='Verified on this device. Return to the QR display device to continue.';
       }catch(e){ statusEl.textContent=String(e); }
     });
   </script>

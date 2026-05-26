@@ -341,11 +341,11 @@
 				<div id="passcodeFields" style="display:none;">
 					<div class="field">
 						<label for="passcode">Passcode (4+ digits)</label>
-						<input id="passcode" name="passcode" type="password" minlength="4" maxlength="32" />
+						<input id="passcode" name="passcode" type="password" minlength="4" maxlength="32" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" />
 					</div>
 					<div class="field">
 						<label for="passcode_confirm">Confirm Passcode</label>
-						<input id="passcode_confirm" name="passcode_confirm" type="password" minlength="4" maxlength="32" />
+						<input id="passcode_confirm" name="passcode_confirm" type="password" minlength="4" maxlength="32" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" />
 					</div>
 				</div>
 				<div class="field">

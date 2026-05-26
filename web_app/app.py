@@ -634,6 +634,10 @@ def infer_mime_type(filename: str, mime_type: str | None = None) -> str:
     return "application/octet-stream"
 
 
+def is_numeric_passcode(passcode: str, min_length: int = 4) -> bool:
+    return len(passcode) >= min_length and passcode.isdigit()
+
+
 def apply_biometric_failure(conn: sqlite3.Connection, userid: str, current_failed_attempts: int | None) -> tuple[int, str | None]:
     failed_attempts = int(current_failed_attempts or 0) + 1
     lock_until_value = None
@@ -829,8 +833,8 @@ def register_user():
     created_at = now_utc().isoformat()
 
     if auth_method == "passcode":
-        if not passcode or passcode != passcode_confirm or len(passcode) < 4:
-            return redirect(build_registration_url("Passcode required, must match and be at least 4 characters."))
+        if not passcode or passcode != passcode_confirm or not is_numeric_passcode(passcode):
+            return redirect(build_registration_url("Passcode required, must match and contain only digits."))
         passcode_hash = generate_password_hash(passcode)
 
         try:
@@ -1044,8 +1048,8 @@ def account_set_passcode():
         return jsonify({"error": "Not signed in."}), 401
     payload = request.get_json(silent=True) or {}
     passcode = str(payload.get('passcode') or '').strip()
-    if len(passcode) < 4:
-        return jsonify({"error": "Passcode must be at least 4 characters."}), 400
+    if not is_numeric_passcode(passcode):
+        return jsonify({"error": "Passcode must contain only digits and be at least 4 characters."}), 400
     passcode_hash = generate_password_hash(passcode)
     with db_connection() as conn:
         conn.execute('UPDATE users SET passcode_hash = ? WHERE userid = ?', (passcode_hash, userid))
@@ -1240,6 +1244,8 @@ def biometric_auth_verify():
             ).fetchone()
             if not stored or not stored["passcode_hash"]:
                 return jsonify({"error": "Passcode not configured for this account."}), 400
+            if not is_numeric_passcode(passcode):
+                return jsonify({"error": "Passcode must contain only digits."}), 400
 
             if not check_password_hash(stored["passcode_hash"], passcode):
                 apply_biometric_failure(conn, userid, stored["biometric_failed_attempts"])
@@ -1338,7 +1344,8 @@ def biometric_qr_status():
         return jsonify({'error': 'Not found.'}), 404
 
     expired = parse_utc(row['expires_at']) < now_utc()
-    return jsonify({'verified': bool(row['verified']), 'expired': bool(expired), 'redirect': '/password.html' if row['verified'] else None})
+    redirect_url = f"/api/biometric/qr/{token}/claim" if row['verified'] else None
+    return jsonify({'verified': bool(row['verified']), 'expired': bool(expired), 'redirect': redirect_url})
 
 
 @app.get('/biometric/qr/<token>')
@@ -1422,10 +1429,23 @@ def biometric_qr_token_verify(token):
         clear_biometric_lockout(conn, row['userid'])
         conn.execute('UPDATE cross_device_auth SET verified = 1, verified_at = ? WHERE token = ?', (now_utc().isoformat(), token))
 
+    return jsonify({'message': 'Verified', 'redirect': None})
+
+
+@app.get('/api/biometric/qr/<token>/claim')
+def biometric_qr_token_claim(token):
+    with db_connection() as conn:
+        row = conn.execute('SELECT userid, expires_at, verified FROM cross_device_auth WHERE token = ?', (token,)).fetchone()
+    if not row:
+        return jsonify({'error': 'Not found.'}), 404
+    if parse_utc(row['expires_at']) < now_utc():
+        return jsonify({'error': 'Token expired.'}), 410
+    if not row['verified']:
+        return jsonify({'error': 'Verification not complete.'}), 400
+
     session['pending_user_id'] = row['userid']
     session['biometric_verified'] = True
-
-    return jsonify({'message': 'Verified', 'redirect': '/password.html'})
+    return redirect('/password.html')
 
 
 @app.get("/password.html")
@@ -1776,6 +1796,8 @@ def forgot_reset():
         if method == "passcode":
             if not user["passcode_hash"]:
                 return jsonify({"error": "PIN passcode is not configured for this account."}), 400
+            if not is_numeric_passcode(passcode):
+                return jsonify({"error": "PIN passcode must contain only digits."}), 400
             if not passcode or not check_password_hash(user["passcode_hash"], passcode):
                 return jsonify({"error": "PIN passcode verification failed."}), 403
         elif method == "biometric":
