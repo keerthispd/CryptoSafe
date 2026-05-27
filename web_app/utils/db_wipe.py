@@ -9,7 +9,7 @@ if not DB_PATH.exists():
     print('Database file not found.')
     raise SystemExit(1)
 
-conn = sqlite3.connect(DB_PATH)
+conn = db_connection()
 cur = conn.cursor()
 
 print('Deleting from user_files...')

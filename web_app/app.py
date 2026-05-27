@@ -165,7 +165,7 @@ def decrypt_bytes(encoded_payload: str) -> bytes:
 
 def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(DB_PATH) as conn:
+    with db_connection() as conn:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -343,20 +343,31 @@ def init_db() -> None:
             )
             """
         )
+        conn.commit()
 
 
 def db_connection() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
 
+    conn = sqlite3.connect(
+        DB_PATH,
+        timeout=30,
+        check_same_thread=False
+    )
+
+    conn.row_factory = sqlite3.Row
+
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute("PRAGMA foreign_keys=ON")
+
+    return conn
 
 @app.route("/__debug/db_info")
 def debug_db_info():
     try:
         exists = DB_PATH.exists()
-        with sqlite3.connect(DB_PATH) as conn:
+        with db_connection() as conn:
             c = conn.cursor()
             tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")]
             pragma = [list(r) for r in c.execute("PRAGMA table_info('cross_device_auth')")]
@@ -856,7 +867,7 @@ def register_user():
         passcode_hash = generate_password_hash(passcode)
 
         try:
-            with sqlite3.connect(DB_PATH) as conn:
+            with db_connection() as conn:
                 conn.execute(
                     """
                     INSERT INTO users (
@@ -922,7 +933,7 @@ def register_user():
     sign_count = int(registration_verification.sign_count)
 
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with db_connection() as conn:
             conn.execute(
                 """
                 INSERT INTO users (
@@ -2415,7 +2426,7 @@ print("Serving from:", BASE_DIR)
 #for checking existing users in DB (not exposed in production)
 @app.route("/users")
 def users():
-    with sqlite3.connect(DB_PATH) as conn:
+    with db_connection() as conn:
         conn.row_factory = sqlite3.Row
 
         rows = conn.execute(
@@ -2426,7 +2437,7 @@ def users():
 
 @app.route("/database-view")
 def database_view():
-    with sqlite3.connect(DB_PATH) as conn:
+    with db_connection() as conn:
         conn.row_factory = sqlite3.Row
 
         users = conn.execute("""
