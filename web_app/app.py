@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import html
 import hashlib
 import io
 import json
@@ -13,7 +14,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from flask import Flask, jsonify, redirect, request, send_file, send_from_directory, session
+from flask import Flask, jsonify, redirect, render_template, request, send_file, send_from_directory, session
 import segno
 from webauthn import (
     base64url_to_bytes,
@@ -447,12 +448,22 @@ def relying_party_id() -> str:
         origin = origin.replace("127.0.0.1", "localhost")
     return origin'''
 def expected_origin() -> str:
-    scheme = request.headers.get(
-        "X-Forwarded-Proto",
-        request.scheme
-    )
-
-    return f"{scheme}://{relying_party_id()}"
+    # Use the full request origin (scheme + host + port) to match the
+    # browser's origin used during WebAuthn operations. Normalize
+    # 127.0.0.1 -> localhost because many browsers treat localhost as
+    # a secure context even when using 127.0.0.1.
+    origin = request.host_url.rstrip("/")
+    if "127.0.0.1" in origin:
+        origin = origin.replace("127.0.0.1", "localhost")
+    # If behind a proxy that sets X-Forwarded-Proto, honor it for scheme
+    proto = request.headers.get("X-Forwarded-Proto")
+    if proto:
+        # rebuild origin with forwarded proto but keep host:port
+        host = request.host
+        origin = f"{proto}://{host}"
+        if "127.0.0.1" in origin:
+            origin = origin.replace("127.0.0.1", "localhost")
+    return origin
 
 def uploaded_file_from_request(field_name: str = "upload_file"):
     uploaded = request.files.get(field_name)
@@ -1900,7 +1911,10 @@ def get_account_info():
     if auth_error:
         return auth_error
 
-    return jsonify({"userid": session_user()})
+    userid = session_user()
+    admins = [s.strip() for s in os.environ.get("DB_VIEW_ADMINS", "").split(",") if s.strip()]
+    is_admin = bool(userid and userid in admins)
+    return jsonify({"userid": userid, "is_admin": is_admin})
 
 
 @app.post("/api/files")
@@ -2437,37 +2451,99 @@ def users():
 
 @app.route("/database-view")
 def database_view():
+    # admin-only lightweight DB view for demos
+    token = request.args.get("token", "")
+    expected = os.environ.get("DB_VIEW_TOKEN", "")
+    if not expected or token != expected:
+        return "Unauthorized. Provide correct token via ?token=...", 401
+
+    def summarize(val: str | None) -> str:
+        if not val:
+            return "(none)"
+
+        value = str(val)
+        preview = html.escape(value[:24])
+        return f"(protected, len={len(value)}, sample={preview})"
+
+    def safe_text(val: str | None) -> str:
+        return html.escape("" if val is None else str(val))
+
+    def yes_no(val: object) -> str:
+        return "yes" if val else "no"
+
     with db_connection() as conn:
         conn.row_factory = sqlite3.Row
-
-        users = conn.execute("""
-            SELECT userid,password_hash,created_at
+        users = conn.execute(
+            """
+            SELECT userid, password_hash, passcode_hash, webauthn_credential_id, created_at
             FROM users
-        """).fetchall()
+            ORDER BY created_at DESC
+            LIMIT 200
+            """
+        ).fetchall()
 
-    html = """
-    <h2>CryptoSafe Database Contents</h2>
+        files = conn.execute(
+            """
+            SELECT id, userid, title, content_encrypted, created_at
+            FROM user_files
+            ORDER BY created_at DESC
+            LIMIT 200
+            """
+        ).fetchall()
 
-    <table border="1" cellpadding="10">
-        <tr>
-            <th>User ID</th>
-            <th>Password Hash</th>
-            <th>Created</th>
-        </tr>
-    """
+        attachments = conn.execute(
+            """
+            SELECT id, file_id, userid, uploaded_file_name, uploaded_file_mime, uploaded_file_size, created_at
+            FROM user_file_attachments
+            ORDER BY created_at DESC
+            LIMIT 200
+            """
+        ).fetchall()
 
-    for row in users:
-        html += f"""
-        <tr>
-            <td>{row['userid']}</td>
-            <td>{row['password_hash']}</td>
-            <td>{row['created_at']}</td>
-        </tr>
-        """
+    users_view = [
+        {
+            "userid": safe_text(r["userid"]),
+            "password_hash": summarize(r["password_hash"]),
+            "passcode_hash": summarize(r["passcode_hash"]),
+            "webauthn_credential": yes_no(r["webauthn_credential_id"]),
+            "created_at": safe_text(r["created_at"]),
+        }
+        for r in users
+    ]
+    files_view = [
+        {
+            "id": safe_text(r["id"]),
+            "userid": safe_text(r["userid"]),
+            "title": safe_text(r["title"]),
+            "encrypted": yes_no(r["content_encrypted"]),
+            "created_at": safe_text(r["created_at"]),
+        }
+        for r in files
+    ]
+    attachments_view = [
+        {
+            "id": safe_text(r["id"]),
+            "file_id": safe_text(r["file_id"]),
+            "userid": safe_text(r["userid"]),
+            "name": safe_text(r["uploaded_file_name"]),
+            "mime": safe_text(r["uploaded_file_mime"]),
+            "size": safe_text(r["uploaded_file_size"]),
+            "created_at": safe_text(r["created_at"]),
+        }
+        for r in attachments
+    ]
 
-    html += "</table>"
-
-    return html
+    return render_template(
+        "database_view.html",
+        database_path=str(DB_PATH),
+        users=users_view,
+        files=files_view,
+        attachments=attachments_view,
+        user_count=len(users_view),
+        file_count=len(files_view),
+        attachment_count=len(attachments_view),
+    )
+print(app.url_map)
 
 if __name__ == "__main__":
     init_db()

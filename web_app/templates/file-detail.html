@@ -838,15 +838,18 @@
       const fileName = String(name || '').toLowerCase();
       const match = fileName.match(/\.([a-z0-9]+)$/);
       const ext = match ? match[1] : '';
-      if (['mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac', 'mp4', 'webm'].includes(ext)) return 'audio/' + (ext === 'mp3' ? 'mpeg' : ext === 'm4a' ? 'mp4' : ext);
+      if (['mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac', 'mp4', 'webm', 'oga', 'opus', '3gp', 'amr'].includes(ext)) return 'audio/' + (ext === 'mp3' ? 'mpeg' : ext === 'm4a' ? 'mp4' : ext);
       if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) return 'image/' + (ext === 'jpg' ? 'jpeg' : ext === 'jpeg' ? 'jpeg' : ext === 'svg' ? 'svg+xml' : ext);
       if (ext === 'pdf') return 'application/pdf';
       return mime || 'application/octet-stream';
     }
 
     function updateDeleteSelectedButton() {
-      deleteSelectedBtn.style.display = selectedDeleteIds.size ? "inline-block" : "none";
+      const canDelete = editingEnabled && currentAttachments.length > 0;
+      deleteSelectedBtn.style.display = canDelete && selectedDeleteIds.size ? "inline-block" : "none";
+      deleteSelectedBtn.disabled = !canDelete;
       deleteSelectedBtn.textContent = selectedDeleteIds.size ? `Delete selected (${selectedDeleteIds.size})` : "Delete selected";
+      selectAllBtn.disabled = !canDelete;
       const allSelected = currentAttachments.length > 0 && selectedDeleteIds.size === currentAttachments.length;
       selectAllBtn.textContent = allSelected ? "Clear all" : "Select all";
       selectAllBtn.classList.toggle("active", allSelected);
@@ -876,6 +879,7 @@
         const selectDelete = document.createElement("input");
         selectDelete.type = "checkbox";
         selectDelete.className = "attachment-checkbox-input";
+        selectDelete.disabled = !editingEnabled;
         selectDelete.dataset.attachmentId = String(attachment.attachment_id || "");
         selectDelete.addEventListener("change", () => {
           const key = String(attachment.attachment_id || "");
@@ -894,7 +898,7 @@
         const fileName = String(attachment.uploaded_file_name || '').toLowerCase();
         const match = fileName.match(/\.([a-z0-9]+)$/);
         const ext = match ? match[1] : '';
-        const isAudio = ['mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac'].includes(ext);
+        const isAudio = ['mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac', 'mp4', 'webm', 'oga', 'opus', '3gp', 'amr'].includes(ext);
         const themeClass = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(ext)
           ? 'badge--accent'
           : ['pdf'].includes(ext)
@@ -1035,8 +1039,12 @@
       } else if (mime.startsWith('audio/')) {
         const audio = document.createElement('audio');
         audio.controls = true;
+        audio.autoplay = true;
+        audio.preload = 'auto';
+        audio.style.width = '100%';
         audio.src = _previewUrl;
         previewBody.appendChild(audio);
+        audio.play().catch(() => {});
       } else if (mime === 'application/pdf') {
         const embed = document.createElement('embed');
         embed.src = _previewUrl;
@@ -1161,6 +1169,13 @@
       [title, description, content, uploadFile, passwordConfirm].forEach((el) => {
         if (isReadOnly) el.classList.add('readonly'); else el.classList.remove('readonly');
       });
+      attachmentList.querySelectorAll('input[type="checkbox"][data-attachment-id]').forEach((checkbox) => {
+        checkbox.disabled = isReadOnly;
+      });
+      if (isReadOnly) {
+        selectedDeleteIds.clear();
+      }
+      updateDeleteSelectedButton();
       updateBtn.textContent = isReadOnly ? 'Edit' : 'Lock';
     }
     // password modal elements
