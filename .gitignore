@@ -1,1 +1,16 @@
 __pycache__/
+
+.venv/
+venv/
+
+cryptosafe.db
+cryptosafe.db-shm
+cryptosafe.db-wal
+
+scripts/
+
+doc/
+mobile_app/
+
+render-data/
+
