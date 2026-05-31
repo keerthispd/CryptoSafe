@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import base64
-import html
 import hashlib
-import ipaddress
 import io
 import json
 import mimetypes
@@ -15,7 +13,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from flask import Flask, jsonify, redirect, render_template, request, send_file, send_from_directory, session
+from flask import Flask, jsonify, redirect, request, send_file, send_from_directory, session
 import segno
 from webauthn import (
     base64url_to_bytes,
@@ -36,30 +34,10 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from web_app.sqlcipher_db import open_sqlcipher_database, resolve_sqlcipher_key
-
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"
-
-
-def resolve_database_path() -> Path:
-    explicit_path = os.environ.get("DATABASE_PATH", "").strip()
-    if explicit_path:
-        return Path(explicit_path)
-
-    render_disk_path = os.environ.get("RENDER_DISK_PATH", "").strip()
-    if render_disk_path:
-        return Path(render_disk_path) / "cryptosafe.db"
-
-    if os.environ.get("RENDER", "").strip():
-        return Path("/opt/render/project/src/data/cryptosafe.db")
-
-    return BASE_DIR / "cryptosafe.db"
-
-
-DB_PATH = resolve_database_path()
-DB_KEY = resolve_sqlcipher_key()
+DB_PATH = Path(os.environ.get("DATABASE_PATH", str(BASE_DIR / "cryptosafe.db")))
 LOCKOUT_DURATION = timedelta(hours=24)
 MAX_FAILED_ATTEMPTS = 3
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -87,13 +65,8 @@ ALLOWED_UPLOAD_EXTENSIONS = {
     "ogg",
     "aac",
     "flac",
-    "mp4",
-    "m4v",
-    "webm",
-    "mov",
-    "avi",
 }
-ALLOWED_UPLOAD_MIME_PREFIXES = ("image/", "audio/", "video/")
+ALLOWED_UPLOAD_MIME_PREFIXES = ("image/", "audio/")
 ALLOWED_UPLOAD_MIME_TYPES = {
     "application/pdf",
     "application/msword",
@@ -108,17 +81,15 @@ ALLOWED_UPLOAD_MIME_TYPES = {
     "audio/mpeg",
     "audio/mp3",
     "audio/wav",
-    # Common video MIME types
-    "video/mp4",
-    "video/webm",
-    "video/ogg",
-    "video/quicktime",
+    "audio/x-wav",
+    "audio/mp4",
+    "audio/ogg",
+    "audio/aac",
+    "audio/flac",
 }
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
-app.config["DATABASE_PATH"] = str(DB_PATH)
-app.config["DATABASE_KEY"] = DB_KEY
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 
@@ -176,7 +147,7 @@ def decrypt_bytes(encoded_payload: str) -> bytes:
 
 def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with db_connection() as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -354,17 +325,20 @@ def init_db() -> None:
             )
             """
         )
-        conn.commit()
 
 
 def db_connection() -> sqlite3.Connection:
-    return open_sqlcipher_database(DB_PATH, DB_KEY)
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
 
 @app.route("/__debug/db_info")
 def debug_db_info():
     try:
         exists = DB_PATH.exists()
-        with db_connection() as conn:
+        with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
             tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")]
             pragma = [list(r) for r in c.execute("PRAGMA table_info('cross_device_auth')")]
@@ -432,136 +406,24 @@ def encode_base64url(data: bytes) -> str:
 
 
 def relying_party_id() -> str:
-    configured = os.environ.get("WEBAUTHN_RP_ID", "").strip().lower()
-    if configured:
-        return configured
-    # Keep RP ID aligned with the exact host used by the browser.
-    return request.host.split(":", 1)[0].strip().lower()
-
-
-def expected_origin() -> str:
-    configured = os.environ.get("WEBAUTHN_ORIGIN", "").strip().rstrip("/")
-    if configured:
-        return configured
-
-    scheme = request.headers.get("X-Forwarded-Proto", request.scheme)
-    host = request.headers.get("X-Forwarded-Host", request.host)
-    # Use the browser-facing origin exactly; do not rewrite localhost/127.0.0.1.
-    return f"{scheme}://{host}".rstrip("/")
-
-
-def _is_ip_address(value: str) -> bool:
-    try:
-        ipaddress.ip_address(value)
-        return True
-    except ValueError:
-        return False
-
-
-def webauthn_preflight_error() -> str | None:
     host = request.host.split(":", 1)[0].strip().lower()
-    rp_id = relying_party_id().strip().lower()
-    origin = expected_origin()
-    scheme = origin.split("://", 1)[0].lower() if "://" in origin else request.scheme.lower()
-
-    if rp_id == "localhost" and host != "localhost":
-        return "Open this app using http://localhost with the same port for biometric verification."
-
-    if _is_ip_address(rp_id) or rp_id == "0.0.0.0":
-        return "This is an invalid domain for WebAuthn. Use localhost for local testing, or configure WEBAUTHN_RP_ID/WEBAUTHN_ORIGIN to a real HTTPS domain."
-
-    if scheme != "https" and rp_id != "localhost":
-        return "WebAuthn requires HTTPS for non-localhost domains."
-
-    return None
+    if host == "127.0.0.1":
+        host = "localhost"
+    return host
 
 
-def _bool_env(name: str, default: bool = False) -> bool:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
+'''def expected_origin() -> str:
+    origin = request.host_url.rstrip("/")
+    if "127.0.0.1" in origin:
+        origin = origin.replace("127.0.0.1", "localhost")
+    return origin'''
+def expected_origin() -> str:
+    scheme = request.headers.get(
+        "X-Forwarded-Proto",
+        request.scheme
+    )
 
-
-def _webauthn_expected_candidates() -> list[tuple[str, str]]:
-    rp_primary = relying_party_id()
-    origin_primary = expected_origin()
-    candidates: list[tuple[str, str]] = [(rp_primary, origin_primary)]
-
-    allow_loopback_alias = _bool_env("WEBAUTHN_ALLOW_LOOPBACK_ALIAS", default=True)
-    if not allow_loopback_alias:
-        return candidates
-
-    loopback_hosts = {"localhost", "127.0.0.1"}
-    if rp_primary not in loopback_hosts:
-        return candidates
-
-    alternate_rp = "127.0.0.1" if rp_primary == "localhost" else "localhost"
-    if "://" in origin_primary:
-        scheme, rest = origin_primary.split("://", 1)
-        if rest.startswith("localhost"):
-            alternate_origin = f"{scheme}://{rest.replace('localhost', '127.0.0.1', 1)}"
-        elif rest.startswith("127.0.0.1"):
-            alternate_origin = f"{scheme}://{rest.replace('127.0.0.1', 'localhost', 1)}"
-        else:
-            alternate_origin = origin_primary
-    else:
-        alternate_origin = origin_primary
-
-    if (alternate_rp, alternate_origin) not in candidates:
-        candidates.append((alternate_rp, alternate_origin))
-
-    return candidates
-
-
-def verify_registration_with_fallback(*, credential: dict, expected_challenge: bytes):
-    last_error: Exception | None = None
-    for expected_rp_id, expected_origin_value in _webauthn_expected_candidates():
-        try:
-            return verify_registration_response(
-                credential=credential,
-                expected_challenge=expected_challenge,
-                expected_rp_id=expected_rp_id,
-                expected_origin=expected_origin_value,
-                require_user_verification=False,
-            )
-        except Exception as exc:  # noqa: BLE001
-            last_error = exc
-    if last_error is not None:
-        raise last_error
-    raise ValueError("WebAuthn registration verification failed.")
-
-
-def verify_authentication_with_fallback(
-    *,
-    credential: dict,
-    expected_challenge: bytes,
-    credential_public_key: bytes,
-    credential_current_sign_count: int,
-):
-    last_error: Exception | None = None
-    for expected_rp_id, expected_origin_value in _webauthn_expected_candidates():
-        try:
-            return verify_authentication_response(
-                credential=credential,
-                expected_challenge=expected_challenge,
-                expected_rp_id=expected_rp_id,
-                expected_origin=expected_origin_value,
-                credential_public_key=credential_public_key,
-                credential_current_sign_count=credential_current_sign_count,
-                require_user_verification=True,
-            )
-        except Exception as exc:  # noqa: BLE001
-            last_error = exc
-    if last_error is not None:
-        raise last_error
-    raise ValueError("WebAuthn authentication verification failed.")
-
-
-def webauthn_failure_message(prefix: str, exc: Exception) -> str:
-    if app.debug or _bool_env("FLASK_DEBUG", default=False):
-        return f"{prefix} ({exc})"
-    return prefix
+    return f"{scheme}://{relying_party_id()}"
 
 def uploaded_file_from_request(field_name: str = "upload_file"):
     uploaded = request.files.get(field_name)
@@ -976,7 +838,7 @@ def register_user():
         passcode_hash = generate_password_hash(passcode)
 
         try:
-            with db_connection() as conn:
+            with sqlite3.connect(DB_PATH) as conn:
                 conn.execute(
                     """
                     INSERT INTO users (
@@ -1023,18 +885,17 @@ def register_user():
 
     try:
         biometric_credential = json.loads(biometric_credential_raw)
-        registration_verification = verify_registration_with_fallback(
+        registration_verification = verify_registration_response(
             credential=biometric_credential,
             expected_challenge=base64url_to_bytes(challenge_b64),
+            expected_rp_id=relying_party_id(),
+            expected_origin=expected_origin(),
+            require_user_verification=True,
         )
-    except Exception as exc:
-        app.logger.exception("Biometric registration verification failed")
+    except Exception:
         return redirect(
             build_registration_url(
-                webauthn_failure_message(
-                    "Biometric registration failed. Please retry and approve biometric verification.",
-                    exc,
-                )
+                "Biometric registration failed. Please retry and approve biometric verification."
             )
         )
 
@@ -1043,7 +904,7 @@ def register_user():
     sign_count = int(registration_verification.sign_count)
 
     try:
-        with db_connection() as conn:
+        with sqlite3.connect(DB_PATH) as conn:
             conn.execute(
                 """
                 INSERT INTO users (
@@ -1082,10 +943,6 @@ def register_user():
 
 @app.post("/api/biometric/register/options")
 def biometric_register_options():
-    preflight_error = webauthn_preflight_error()
-    if preflight_error:
-        return jsonify({"error": preflight_error}), 400
-
     userid = payload_value("userid").strip()
     if len(userid) < 3:
         return jsonify({"error": "User ID must be at least 3 characters."}), 400
@@ -1131,10 +988,6 @@ def account_webauthn_register_options():
     if not userid:
         return jsonify({"error": "Not signed in."}), 401
 
-    preflight_error = webauthn_preflight_error()
-    if preflight_error:
-        return jsonify({"error": preflight_error}), 400
-
     options = generate_registration_options(
         rp_id=relying_party_id(),
         rp_name='CryptoSafe',
@@ -1164,12 +1017,15 @@ def account_webauthn_register_verify():
         return jsonify({"error": "Missing credential or challenge."}), 400
 
     try:
-        verification = verify_registration_with_fallback(
+        verification = verify_registration_response(
             credential=credential,
             expected_challenge=base64url_to_bytes(challenge_b64),
+            expected_rp_id=relying_party_id(),
+            expected_origin=expected_origin(),
+            require_user_verification=True,
         )
-    except Exception as exc:
-        return jsonify({"error": webauthn_failure_message("Registration verification failed.", exc)}), 400
+    except Exception:
+        return jsonify({"error": "Registration verification failed."}), 400
 
     credential_id = encode_base64url(verification.credential_id)
     public_key = encode_base64url(verification.credential_public_key)
@@ -1232,8 +1088,8 @@ def login_user():
         with db_connection() as conn:
             user = conn.execute(
                 """
-                  SELECT userid, password_hash, failed_attempts, locked_until,
-                      webauthn_credential_id, passcode_hash
+                SELECT userid, password_hash, failed_attempts, locked_until,
+                       webauthn_credential_id
                 FROM users
                 WHERE userid = ?
                 """,
@@ -1254,12 +1110,10 @@ def login_user():
                 )
 
             if check_password_hash(user["password_hash"], password):
-                has_webauthn = bool(user["webauthn_credential_id"])
-                has_passcode = bool(user["passcode_hash"])
-                if not has_webauthn and not has_passcode:
+                if not user["webauthn_credential_id"]:
                     return redirect(
                         build_login_url(
-                            "This account has no biometric or passcode credential enrolled. Please update the account settings."
+                            "This account has no biometric credential enrolled. Please re-register to enable two-phase login."
                         )
                     )
 
@@ -1312,10 +1166,6 @@ def login_user():
 
 @app.post("/api/biometric/auth/options")
 def biometric_auth_options():
-    preflight_error = webauthn_preflight_error()
-    if preflight_error:
-        return jsonify({"error": preflight_error}), 400
-
     userid = session.get("pending_user_id")
     if not userid:
         return jsonify({"error": "Start login first."}), 401
@@ -1414,15 +1264,18 @@ def biometric_auth_verify():
             return jsonify({"error": "Biometric credential is not configured for this account."}), 400
 
         try:
-            verification = verify_authentication_with_fallback(
+            verification = verify_authentication_response(
                 credential=credential,
                 expected_challenge=base64url_to_bytes(challenge_b64),
+                expected_rp_id=relying_party_id(),
+                expected_origin=expected_origin(),
                 credential_public_key=base64url_to_bytes(str(user["webauthn_public_key"])),
                 credential_current_sign_count=int(user["webauthn_sign_count"] or 0),
+                require_user_verification=True,
             )
-        except Exception as exc:
+        except Exception:
             apply_biometric_failure(conn, userid, user["biometric_failed_attempts"])
-            return jsonify({"error": webauthn_failure_message("Biometric verification failed.", exc)}), 403
+            return jsonify({"error": "Biometric verification failed."}), 403
 
         # success: reset biometric counters and mark verified for password phase
         conn.execute("UPDATE users SET webauthn_sign_count = ? WHERE userid = ?", (int(verification.new_sign_count), userid))
@@ -1505,10 +1358,6 @@ def biometric_qr_consumer(token):
 
 @app.post('/api/biometric/qr/<token>/options')
 def biometric_qr_token_options(token):
-    preflight_error = webauthn_preflight_error()
-    if preflight_error:
-        return jsonify({'error': preflight_error}), 400
-
     with db_connection() as conn:
         row = conn.execute('SELECT userid, expires_at, verified FROM cross_device_auth WHERE token = ?', (token,)).fetchone()
         if not row:
@@ -1562,15 +1411,18 @@ def biometric_qr_token_verify(token):
             return jsonify({'error': 'Biometric not configured.'}), 400
 
         try:
-            verification = verify_authentication_with_fallback(
+            verification = verify_authentication_response(
                 credential=credential,
                 expected_challenge=base64url_to_bytes(row['challenge_b64']),
+                expected_rp_id=relying_party_id(),
+                expected_origin=expected_origin(),
                 credential_public_key=base64url_to_bytes(str(user['webauthn_public_key'])),
                 credential_current_sign_count=int(user['webauthn_sign_count'] or 0),
+                require_user_verification=True,
             )
-        except Exception as exc:
+        except Exception:
             apply_biometric_failure(conn, row['userid'], user['biometric_failed_attempts'])
-            return jsonify({'error': webauthn_failure_message('Biometric verification failed.', exc)}), 403
+            return jsonify({'error': 'Biometric verification failed.'}), 403
 
         # update counters and mark verified
         conn.execute('UPDATE users SET webauthn_sign_count = ? WHERE userid = ?', (int(verification.new_sign_count), row['userid']))
@@ -1732,10 +1584,6 @@ def forgot_context():
 
 @app.post("/api/forgot/biometric/options")
 def forgot_biometric_options():
-    preflight_error = webauthn_preflight_error()
-    if preflight_error:
-        return jsonify({"error": preflight_error}), 400
-
     userid = session.get("recovery_user_id")
     if not userid:
         return jsonify({"error": "Start password recovery first."}), 401
@@ -1817,14 +1665,17 @@ def forgot_biometric_verify():
             return jsonify({"error": "Biometric is not configured for this account."}), 400
 
         try:
-            verification = verify_authentication_with_fallback(
+            verification = verify_authentication_response(
                 credential=credential,
                 expected_challenge=base64url_to_bytes(challenge_b64),
+                expected_rp_id=relying_party_id(),
+                expected_origin=expected_origin(),
                 credential_public_key=base64url_to_bytes(str(user["webauthn_public_key"])),
                 credential_current_sign_count=int(user["webauthn_sign_count"] or 0),
+                require_user_verification=True,
             )
-        except Exception as exc:
-            return jsonify({"error": webauthn_failure_message("Biometric verification failed.", exc)}), 403
+        except Exception:
+            return jsonify({"error": "Biometric verification failed."}), 403
 
         conn.execute(
             "UPDATE users SET webauthn_sign_count = ? WHERE userid = ?",
@@ -2020,10 +1871,7 @@ def get_account_info():
     if auth_error:
         return auth_error
 
-    userid = session_user()
-    admins = [s.strip() for s in os.environ.get("DB_VIEW_ADMINS", "").split(",") if s.strip()]
-    is_admin = bool(userid and userid in admins)
-    return jsonify({"userid": userid, "is_admin": is_admin})
+    return jsonify({"userid": session_user()})
 
 
 @app.post("/api/files")
@@ -2085,85 +1933,6 @@ def create_user_file():
 
     response = {"message": "File created successfully.", "id": file_id}
     return jsonify(response), 201
-
-
-@app.post("/api/files/<int:file_id>/upload_audio_chunk")
-def upload_audio_chunk(file_id: int):
-    auth_error = json_auth_required()
-    if auth_error:
-        return auth_error
-
-    userid = session_user()
-    if not userid:
-        return jsonify({"error": "Not signed in."}), 401
-
-    password = request.form.get("password", "")
-    if not password or not verify_user_password(userid, password):
-        return jsonify({"error": "Password confirmation failed."}), 403
-
-    chunk = request.files.get("chunk")
-    filename = request.form.get("filename") or (chunk.filename if chunk is not None else f"recording_{file_id}.webm")
-    mime = (chunk.mimetype if chunk is not None else request.form.get("mime", "audio/webm")) or "audio/webm"
-    final_flag = str(request.form.get("final", "false")).lower() == "true"
-
-    # store incoming chunks in a temporary file and append; finalize on final=True
-    tmp_dir = BASE_DIR / "uploads" / "tmp_chunks"
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    part_path = tmp_dir / f"{userid}_{file_id}.part"
-
-    if chunk is None:
-        return jsonify({"error": "No audio chunk provided."}), 400
-
-    try:
-        with open(part_path, "ab") as f:
-            f.write(chunk.read())
-    except Exception as e:
-        return jsonify({"error": f"Failed to write chunk: {e}"}), 500
-
-    if not final_flag:
-        return jsonify({"message": "Chunk appended."}), 200
-
-    # finalize: read full bytes, validate, encrypt and save as an attachment
-    try:
-        with open(part_path, "rb") as f:
-            full = f.read()
-    except Exception as e:
-        return jsonify({"error": f"Failed to read assembled audio: {e}"}), 500
-
-    # size checks
-    if len(full) > MAX_UPLOAD_BYTES:
-        try:
-            part_path.unlink()
-        except Exception:
-            pass
-        return jsonify({"error": "Uploaded audio too large."}), 400
-
-    try:
-        encrypted = encrypt_bytes(full)
-    except Exception as e:
-        return jsonify({"error": f"Encryption failed: {e}"}), 500
-
-    upload_entry = {
-        "name": secure_filename(filename),
-        "mime": mime,
-        "size": len(full),
-        "encrypted": encrypted,
-    }
-
-    created_at = now_utc().isoformat()
-    try:
-        with db_connection() as conn:
-            save_file_attachments(conn, file_id, userid, [upload_entry], created_at, replace_existing=False)
-            sync_legacy_file_attachment_columns(conn, file_id, userid)
-    except Exception as e:
-        return jsonify({"error": f"Failed to save attachment: {e}"}), 500
-
-    try:
-        part_path.unlink()
-    except Exception:
-        pass
-
-    return jsonify({"message": "Audio uploaded successfully.", "size": len(full)}), 200
 
 
 @app.post("/api/files/<int:file_id>/display")
@@ -2596,18 +2365,6 @@ def admin_wipe_all():
     init_db()
     return jsonify({"message": "All user accounts and files have been erased."})
 
-
-# Development helper: set session user for local testing only
-@app.get('/__dev/login_as')
-def dev_login_as():
-    if not app.debug and not _bool_env('FLASK_ENV', default=False):
-        return "Not allowed.", 403
-    userid = (request.args.get('userid') or '').strip()
-    if not userid:
-        return "Provide ?userid=...", 400
-    session['user_id'] = userid
-    return jsonify({'message': f'Logged in as {userid}'})
-
 @app.post("/api/account/delete")
 def delete_account():
     auth_error = json_auth_required()
@@ -2640,7 +2397,7 @@ print("Serving from:", BASE_DIR)
 #for checking existing users in DB (not exposed in production)
 @app.route("/users")
 def users():
-    with db_connection() as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
 
         rows = conn.execute(
@@ -2648,102 +2405,6 @@ def users():
         ).fetchall()
 
     return [dict(row) for row in rows]
-
-@app.route("/database-view")
-def database_view():
-    # admin-only lightweight DB view for demos
-    token = request.args.get("token", "")
-    expected = os.environ.get("DB_VIEW_TOKEN", "")
-    if not expected or token != expected:
-        return "Unauthorized. Provide correct token via ?token=...", 401
-
-    def summarize(val: str | None) -> str:
-        if not val:
-            return "(none)"
-
-        value = str(val)
-        preview = html.escape(value[:24])
-        return f"(protected, len={len(value)}, sample={preview})"
-
-    def safe_text(val: str | None) -> str:
-        return html.escape("" if val is None else str(val))
-
-    def yes_no(val: object) -> str:
-        return "yes" if val else "no"
-
-    with db_connection() as conn:
-        conn.row_factory = sqlite3.Row
-        users = conn.execute(
-            """
-            SELECT userid, password_hash, passcode_hash, webauthn_credential_id, created_at
-            FROM users
-            ORDER BY created_at DESC
-            LIMIT 200
-            """
-        ).fetchall()
-
-        files = conn.execute(
-            """
-            SELECT id, userid, title, content_encrypted, created_at
-            FROM user_files
-            ORDER BY created_at DESC
-            LIMIT 200
-            """
-        ).fetchall()
-
-        attachments = conn.execute(
-            """
-            SELECT id, file_id, userid, uploaded_file_name, uploaded_file_mime, uploaded_file_size, created_at
-            FROM user_file_attachments
-            ORDER BY created_at DESC
-            LIMIT 200
-            """
-        ).fetchall()
-
-    users_view = [
-        {
-            "userid": safe_text(r["userid"]),
-            "password_hash": summarize(r["password_hash"]),
-            "passcode_hash": summarize(r["passcode_hash"]),
-            "webauthn_credential": yes_no(r["webauthn_credential_id"]),
-            "created_at": safe_text(r["created_at"]),
-        }
-        for r in users
-    ]
-    files_view = [
-        {
-            "id": safe_text(r["id"]),
-            "userid": safe_text(r["userid"]),
-            "title": safe_text(r["title"]),
-            "encrypted": yes_no(r["content_encrypted"]),
-            "created_at": safe_text(r["created_at"]),
-        }
-        for r in files
-    ]
-    attachments_view = [
-        {
-            "id": safe_text(r["id"]),
-            "file_id": safe_text(r["file_id"]),
-            "userid": safe_text(r["userid"]),
-            "name": safe_text(r["uploaded_file_name"]),
-            "mime": safe_text(r["uploaded_file_mime"]),
-            "size": safe_text(r["uploaded_file_size"]),
-            "created_at": safe_text(r["created_at"]),
-        }
-        for r in attachments
-    ]
-
-    return render_template(
-        "database_view.html",
-        database_path=str(DB_PATH),
-        users=users_view,
-        files=files_view,
-        attachments=attachments_view,
-        user_count=len(users_view),
-        file_count=len(files_view),
-        attachment_count=len(attachments_view),
-    )
-print(app.url_map)
 
 if __name__ == "__main__":
     init_db()

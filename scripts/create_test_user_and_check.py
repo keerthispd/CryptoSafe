@@ -28,7 +28,7 @@ time.sleep(0.5)
 
 db_path = 'web_app/cryptosafe.db'
 print('Checking DB at', db_path)
-conn = db_connection()
+conn = sqlite3.connect(db_path)
 cur = conn.cursor()
 try:
     cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
