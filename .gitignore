@@ -3,10 +3,12 @@ __pycache__/
 .venv/
 venv/
 
-cryptosafe.db
-cryptosafe.db-shm
-cryptosafe.db-wal
+web_app/cryptosafe.db
+web_app/cryptosafe.db-shm
+web_app/cryptosafe.db-wal
 
+render-data
+render-data/
 scripts/
 
 doc/
