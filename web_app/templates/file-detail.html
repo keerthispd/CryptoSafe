@@ -155,6 +155,160 @@
       flex-wrap: wrap;
     }
 
+    .voice-card {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(166, 180, 194, 0.1);
+      margin-bottom: 14px;
+    }
+
+    .voice-card-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 14px;
+    }
+
+    .voice-card-title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 800;
+    }
+
+    .voice-card-copy {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .voice-state {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 11px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--ink);
+      border: 1px solid rgba(166, 180, 194, 0.1);
+      font-size: 0.88rem;
+      white-space: nowrap;
+    }
+
+    .voice-state-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: var(--muted);
+      box-shadow: 0 0 0 0 rgba(110, 231, 183, 0.35);
+    }
+
+    .voice-state.recording {
+      background: rgba(244, 63, 94, 0.1);
+      border-color: rgba(244, 63, 94, 0.18);
+      color: #ffdce3;
+    }
+
+    .voice-state.recording .voice-state-dot {
+      background: #fb7185;
+      animation: voicePulse 1.25s infinite;
+    }
+
+    @keyframes voicePulse {
+      0% { box-shadow: 0 0 0 0 rgba(251, 113, 133, 0.45); }
+      70% { box-shadow: 0 0 0 12px rgba(251, 113, 133, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(251, 113, 133, 0); }
+    }
+
+    .voice-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid rgba(166, 180, 194, 0.12);
+      border-radius: 999px;
+      padding: 11px 14px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--ink);
+      cursor: pointer;
+      font: inherit;
+      font-weight: 700;
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .icon-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      border-color: rgba(110, 231, 183, 0.18);
+    }
+
+    .icon-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .icon-btn.primary {
+      background: rgba(255, 255, 255, 0.055);
+      color: var(--ink);
+      border-color: rgba(166, 180, 194, 0.12);
+    }
+
+    .icon-btn.danger {
+      background: rgba(255, 255, 255, 0.05);
+      color: #ffd7df;
+      border-color: rgba(244, 63, 94, 0.16);
+    }
+
+    .icon-btn .icon {
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      flex: 0 0 auto;
+    }
+
+    .icon-btn.primary .icon,
+    .icon-btn.danger .icon {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .voice-preview {
+      display: none;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(166, 180, 194, 0.1);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    .voice-preview.show { display: block; }
+
+    .voice-preview strong {
+      display: block;
+      color: var(--ink);
+      margin-bottom: 2px;
+    }
+
+    .voice-preview small {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+    }
+
     .btn-row.space-between {
       justify-content: space-between;
       align-items: center;
@@ -686,6 +840,30 @@
             <label for="content">Content</label>
             <textarea id="content"></textarea>
           </div>
+          <div class="voice-card" id="voiceCard">
+            <div class="voice-card-header">
+              <div>
+                <p class="voice-card-title">Voice record</p>
+                <p class="voice-card-copy">Capture a voice attachment first, then review the rest of the file attachments below.</p>
+              </div>
+              <span id="recordStatus" class="voice-state"><span class="voice-state-dot"></span><span>Ready</span></span>
+            </div>
+            <div class="voice-actions">
+              <button id="startRecordBtn" type="button" class="icon-btn primary">
+                <span class="icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3z"/><path d="M19 11a7 7 0 0 1-14 0"/><path d="M12 18v3"/></svg>
+                </span>
+                <span>Record voice</span>
+              </button>
+              <button id="stopRecordBtn" type="button" class="icon-btn danger" disabled>
+                <span class="icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                </span>
+                <span>Stop</span>
+              </button>
+            </div>
+            <div class="voice-preview show" id="recordingHint">Unlock the file to start recording, then tap Stop to upload the voice attachment.</div>
+          </div>
           <div class="field">
             <label class="attachment-title-row">Attachments <span id="attachmentCount" class="attachment-count">0</span></label>
             <div class="toolbar-shell">
@@ -694,11 +872,6 @@
               </div>
               <button type="button" class="warn compact" id="deleteSelectedBtn" style="display:none;">Delete selected</button>
             </div>
-                    <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
-                      <button id="startRecordBtn" type="button" class="alt compact">Start recording</button>
-                      <button id="stopRecordBtn" type="button" class="alt compact" disabled>Stop</button>
-                      <span id="recordStatus" style="color:var(--muted);font-size:0.9rem;">Not recording</span>
-                    </div>
             <div id="attachmentList" class="attachment-list"></div>
           </div>
         </div>
@@ -792,6 +965,8 @@
     const deleteConfirmBtn = document.getElementById('deleteConfirmBtn');
     const deleteCancelBtn = document.getElementById('deleteCancelBtn');
     const deleteStatus = document.getElementById('deleteStatus');
+    const voiceCard = document.getElementById('voiceCard');
+    const recordingHint = document.getElementById('recordingHint');
 
     let currentPassword = "";
     let currentAttachments = [];
@@ -801,6 +976,17 @@
     function show(node, message, kind = "error") {
       node.textContent = message;
       node.className = `status show ${kind}`;
+    }
+
+    function setRecordingState(message, isRecording = false) {
+      recordStatus.className = isRecording ? 'voice-state recording' : 'voice-state';
+      recordStatus.lastElementChild.textContent = message;
+      if (recordingHint) {
+        recordingHint.className = isRecording ? 'voice-preview show' : 'voice-preview show';
+        recordingHint.textContent = isRecording
+          ? 'Recording in progress...'
+          : 'Unlock the file to start recording, then tap Stop to upload the voice attachment.';
+      }
     }
 
     function clear(node) {
@@ -1416,6 +1602,11 @@
       if (isReadOnly) {
         selectedDeleteIds.clear();
       }
+      if (voiceCard) {
+        voiceCard.style.display = isReadOnly ? 'none' : '';
+      }
+      startRecordBtn.disabled = isReadOnly;
+      stopRecordBtn.disabled = true;
       updateDeleteSelectedButton();
       updateBtn.textContent = isReadOnly ? 'Edit' : 'Lock';
     }
@@ -1584,6 +1775,9 @@
 
     startRecordBtn.addEventListener('click', async () => {
       clear(detailStatus);
+      if (!editingEnabled) {
+        return show(detailStatus, 'Enable editing first using Edit button');
+      }
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         return show(detailStatus, 'Browser does not support audio recording.');
       }
@@ -1602,7 +1796,7 @@
           // request finalization by sending a zero-length final chunk headerless, or send last blob with final=true
           // some browsers will have already provided last chunk via dataavailable; ensure server finalizes
           await uploadChunk(new Blob([]), true);
-          recordStatus.textContent = 'Not recording';
+          setRecordingState('Ready', false);
           stopRecordBtn.disabled = true;
           startRecordBtn.disabled = false;
           if (mediaStream) {
@@ -1612,7 +1806,7 @@
         });
         // start and ask for periodic chunks every 3s
         mediaRecorder.start(3000);
-        recordStatus.textContent = 'Recording…';
+        setRecordingState('Recording', true);
         startRecordBtn.disabled = true;
         stopRecordBtn.disabled = false;
       } catch (err) {
@@ -1621,6 +1815,9 @@
     });
 
     stopRecordBtn.addEventListener('click', () => {
+      if (!editingEnabled) {
+        return;
+      }
       if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         mediaRecorder.stop();
       }

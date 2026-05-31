@@ -11,12 +11,15 @@ cryptosafe.db
 data/
 cryptosafe.db-shm
 cryptosafe.db-wal
+sqlcipher_db.py
 
 # Environment variables
 .env
 
 #debug logs
 scripts/
+tools/
+adb_log.txt
 
 #deployment files
 render-data/
@@ -24,4 +27,6 @@ render-data/
 #currently empty, but may be used in the future for other files that should be ignored
 docs/
 
+#currently in development
 mobile_app/
+
