@@ -6,3 +6,6 @@ pyjwt==2.8.0
 gunicorn==23.0.0
 Werkzeug
 segno==1.6.6
+# Optional: SQLCipher Python bindings. Not available on all platforms (Windows/Python combos).
+# Install only if your runtime supports SQLCipher C library (see web_app/README.md "SQLCipher notes").
+# sqlcipher3-binary

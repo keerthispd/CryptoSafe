@@ -694,6 +694,11 @@
               </div>
               <button type="button" class="warn compact" id="deleteSelectedBtn" style="display:none;">Delete selected</button>
             </div>
+                    <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+                      <button id="startRecordBtn" type="button" class="alt compact">Start recording</button>
+                      <button id="stopRecordBtn" type="button" class="alt compact" disabled>Stop</button>
+                      <span id="recordStatus" style="color:var(--muted);font-size:0.9rem;">Not recording</span>
+                    </div>
             <div id="attachmentList" class="attachment-list"></div>
           </div>
         </div>
@@ -701,7 +706,7 @@
           <div id="editControls" class="edit-controls hidden">
             <div class="field">
               <label for="uploadFile">Upload</label>
-              <input id="uploadFile" type="file" multiple accept="image/*,audio/*,.pdf,.doc,.docx,.txt,.rtf,.csv,.xls,.xlsx,.ppt,.pptx,.mp3,.wav,.m4a,.ogg,.aac,.flac" />
+              <input id="uploadFile" type="file" multiple accept="image/*,audio/*,video/*,.mp4,.m4v,.webm,.mov,.avi,.pdf,.doc,.docx,.txt,.rtf,.csv,.xls,.xlsx,.ppt,.pptx,.mp3,.wav,.m4a,.ogg,.aac,.flac" />
             </div>
             <div class="field">
               <label for="passwordConfirm">Password</label>
@@ -1027,6 +1032,231 @@
       previewBody.innerHTML = '';
     }
 
+    function formatPreviewTime(seconds) {
+      const safeSeconds = Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
+      const totalSeconds = Math.floor(safeSeconds);
+      const minutes = Math.floor(totalSeconds / 60);
+      const remainingSeconds = totalSeconds % 60;
+      return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+    }
+
+    function createAudioPreviewControls(audio) {
+      const wrap = document.createElement('div');
+      wrap.style.display = 'grid';
+      wrap.style.gap = '10px';
+      wrap.style.marginTop = '12px';
+
+      const toolbar = document.createElement('div');
+      toolbar.style.display = 'flex';
+      toolbar.style.flexWrap = 'wrap';
+      toolbar.style.gap = '8px';
+      toolbar.style.alignItems = 'center';
+
+      const makeButton = (label, onClick) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = label;
+        button.style.width = 'auto';
+        button.style.padding = '8px 12px';
+        button.style.borderRadius = '10px';
+        button.style.border = '1px solid rgba(166, 180, 194, 0.22)';
+        button.style.background = 'rgba(255, 255, 255, 0.08)';
+        button.style.color = 'var(--ink)';
+        button.style.cursor = 'pointer';
+        button.addEventListener('click', onClick);
+        return button;
+      };
+
+      const currentTimeLabel = document.createElement('span');
+      currentTimeLabel.textContent = '0:00 / 0:00';
+      currentTimeLabel.style.color = 'var(--muted)';
+      currentTimeLabel.style.fontSize = '0.92rem';
+      currentTimeLabel.style.minWidth = '96px';
+
+      const scrubber = document.createElement('input');
+      scrubber.type = 'range';
+      scrubber.min = '0';
+      scrubber.max = '1000';
+      scrubber.step = '1';
+      scrubber.value = '0';
+      scrubber.style.flex = '1 1 280px';
+      scrubber.style.minWidth = '220px';
+      scrubber.style.width = 'auto';
+
+      const scrubberRow = document.createElement('div');
+      scrubberRow.style.display = 'flex';
+      scrubberRow.style.gap = '12px';
+      scrubberRow.style.alignItems = 'center';
+      scrubberRow.style.flexWrap = 'wrap';
+
+      const scrubberHint = document.createElement('span');
+      scrubberHint.textContent = 'Drag to seek';
+      scrubberHint.style.color = 'var(--muted)';
+      scrubberHint.style.fontSize = '0.88rem';
+      scrubberHint.style.whiteSpace = 'nowrap';
+
+      const seekBy = (deltaSeconds) => {
+        const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+        const nextTime = Math.min(Math.max((audio.currentTime || 0) + deltaSeconds, 0), duration || Number.MAX_SAFE_INTEGER);
+        audio.currentTime = nextTime;
+        audio.play().catch(() => {});
+      };
+
+      const syncScrubber = () => {
+        const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+        const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+        currentTimeLabel.textContent = `${formatPreviewTime(currentTime)} / ${formatPreviewTime(duration)}`;
+        if (!duration) {
+          scrubber.value = '0';
+          scrubber.disabled = true;
+          return;
+        }
+        scrubber.disabled = false;
+        const percent = Math.min(Math.max(currentTime / duration, 0), 1);
+        scrubber.value = String(Math.round(percent * Number(scrubber.max)));
+      };
+
+      scrubber.addEventListener('input', () => {
+        const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+        if (!duration) {
+          return;
+        }
+        const percent = Number(scrubber.value) / Number(scrubber.max);
+        audio.currentTime = Math.min(Math.max(percent * duration, 0), duration);
+      });
+
+      scrubber.addEventListener('change', () => {
+        audio.play().catch(() => {});
+      });
+
+      toolbar.append(
+        makeButton('⏪ 10s', () => seekBy(-10)),
+        makeButton('⏮ 30s', () => seekBy(-30)),
+        makeButton('⏭ 30s', () => seekBy(30)),
+        makeButton('⏩ 10s', () => seekBy(10)),
+        currentTimeLabel,
+      );
+
+      scrubberRow.append(scrubber, scrubberHint);
+      wrap.append(toolbar, scrubberRow);
+
+      audio.addEventListener('loadedmetadata', syncScrubber);
+      audio.addEventListener('timeupdate', syncScrubber);
+      audio.addEventListener('durationchange', syncScrubber);
+      audio.addEventListener('ended', syncScrubber);
+
+      syncScrubber();
+      return wrap;
+    }
+
+    function createVideoPreviewControls(video) {
+      // reuse audio controls logic but target a HTMLVideoElement
+      const wrap = document.createElement('div');
+      wrap.style.display = 'grid';
+      wrap.style.gap = '10px';
+      wrap.style.marginTop = '12px';
+
+      const toolbar = document.createElement('div');
+      toolbar.style.display = 'flex';
+      toolbar.style.flexWrap = 'wrap';
+      toolbar.style.gap = '8px';
+      toolbar.style.alignItems = 'center';
+
+      const makeButton = (label, onClick) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = label;
+        button.style.width = 'auto';
+        button.style.padding = '8px 12px';
+        button.style.borderRadius = '10px';
+        button.style.border = '1px solid rgba(166, 180, 194, 0.22)';
+        button.style.background = 'rgba(255, 255, 255, 0.08)';
+        button.style.color = 'var(--ink)';
+        button.style.cursor = 'pointer';
+        button.addEventListener('click', onClick);
+        return button;
+      };
+
+      const currentTimeLabel = document.createElement('span');
+      currentTimeLabel.textContent = '0:00 / 0:00';
+      currentTimeLabel.style.color = 'var(--muted)';
+      currentTimeLabel.style.fontSize = '0.92rem';
+      currentTimeLabel.style.minWidth = '96px';
+
+      const scrubber = document.createElement('input');
+      scrubber.type = 'range';
+      scrubber.min = '0';
+      scrubber.max = '1000';
+      scrubber.step = '1';
+      scrubber.value = '0';
+      scrubber.style.flex = '1 1 280px';
+      scrubber.style.minWidth = '220px';
+      scrubber.style.width = 'auto';
+
+      const scrubberRow = document.createElement('div');
+      scrubberRow.style.display = 'flex';
+      scrubberRow.style.gap = '12px';
+      scrubberRow.style.alignItems = 'center';
+      scrubberRow.style.flexWrap = 'wrap';
+
+      const scrubberHint = document.createElement('span');
+      scrubberHint.textContent = 'Drag to seek';
+      scrubberHint.style.color = 'var(--muted)';
+      scrubberHint.style.fontSize = '0.88rem';
+      scrubberHint.style.whiteSpace = 'nowrap';
+
+      const seekBy = (deltaSeconds) => {
+        const duration = Number.isFinite(video.duration) ? video.duration : 0;
+        const nextTime = Math.min(Math.max((video.currentTime || 0) + deltaSeconds, 0), duration || Number.MAX_SAFE_INTEGER);
+        video.currentTime = nextTime;
+        video.play().catch(() => {});
+      };
+
+      const syncScrubber = () => {
+        const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+        const currentTime = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+        currentTimeLabel.textContent = `${formatPreviewTime(currentTime)} / ${formatPreviewTime(duration)}`;
+        if (!duration) {
+          scrubber.value = '0';
+          scrubber.disabled = true;
+          return;
+        }
+        scrubber.disabled = false;
+        const percent = Math.min(Math.max(currentTime / duration, 0), 1);
+        scrubber.value = String(Math.round(percent * Number(scrubber.max)));
+      };
+
+      scrubber.addEventListener('input', () => {
+        const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+        if (!duration) return;
+        const percent = Number(scrubber.value) / Number(scrubber.max);
+        video.currentTime = Math.min(Math.max(percent * duration, 0), duration);
+      });
+
+      scrubber.addEventListener('change', () => {
+        video.play().catch(() => {});
+      });
+
+      toolbar.append(
+        makeButton('⏪ 10s', () => seekBy(-10)),
+        makeButton('⏮ 30s', () => seekBy(-30)),
+        makeButton('⏭ 30s', () => seekBy(30)),
+        makeButton('⏩ 10s', () => seekBy(10)),
+        currentTimeLabel,
+      );
+
+      scrubberRow.append(scrubber, scrubberHint);
+      wrap.append(toolbar, scrubberRow);
+
+      video.addEventListener('loadedmetadata', syncScrubber);
+      video.addEventListener('timeupdate', syncScrubber);
+      video.addEventListener('durationchange', syncScrubber);
+      video.addEventListener('ended', syncScrubber);
+
+      syncScrubber();
+      return wrap;
+    }
+
     function showPreview(blob, name) {
       clearPreview();
       const mime = inferPreviewMime(name, blob.type || '');
@@ -1044,7 +1274,18 @@
         audio.style.width = '100%';
         audio.src = _previewUrl;
         previewBody.appendChild(audio);
+        previewBody.appendChild(createAudioPreviewControls(audio));
         audio.play().catch(() => {});
+      } else if (mime.startsWith('video/')) {
+        const video = document.createElement('video');
+        video.controls = true;
+        video.autoplay = false;
+        video.preload = 'metadata';
+        video.style.width = '100%';
+        video.src = _previewUrl;
+        previewBody.appendChild(video);
+        previewBody.appendChild(createVideoPreviewControls(video));
+        // don't force play for video; let user start playback
       } else if (mime === 'application/pdf') {
         const embed = document.createElement('embed');
         embed.src = _previewUrl;
@@ -1302,6 +1543,86 @@
         window.location.href = "/dashboard.html";
       } catch (error) {
         show(deleteStatus, error.message);
+      }
+    });
+
+    // Live audio recording via MediaRecorder (uploading chunks)
+    const startRecordBtn = document.getElementById('startRecordBtn');
+    const stopRecordBtn = document.getElementById('stopRecordBtn');
+    const recordStatus = document.getElementById('recordStatus');
+    let mediaRecorder = null;
+    let mediaStream = null;
+    let recordingFilename = '';
+
+    async function uploadChunk(blob, isFinal = false) {
+      if (!fileId) return;
+      if (!currentPassword) return show(detailStatus, 'Unlock file before recording');
+      try {
+        const fd = new FormData();
+        fd.append('password', currentPassword);
+        fd.append('filename', recordingFilename || `recording_${Date.now()}.webm`);
+        fd.append('final', isFinal ? 'true' : 'false');
+        fd.append('chunk', blob, recordingFilename || `recording_${Date.now()}.webm`);
+        const resp = await fetch(`/api/files/${fileId}/upload_audio_chunk`, { method: 'POST', body: fd });
+        if (!resp.ok) {
+          const txt = await resp.text();
+          throw new Error(txt || 'Upload failed');
+        }
+        const j = await resp.json().catch(()=>({}));
+        if (isFinal) {
+          // refresh attachment list
+          try {
+            const refreshed = await apiRequest(`/api/files/${fileId}/display`, { method: 'POST', body: JSON.stringify({ password: currentPassword }) });
+            currentAttachments = refreshed.attachments || [];
+            renderAttachments();
+          } catch (e) {}
+        }
+      } catch (err) {
+        show(detailStatus, err.message || String(err));
+      }
+    }
+
+    startRecordBtn.addEventListener('click', async () => {
+      clear(detailStatus);
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        return show(detailStatus, 'Browser does not support audio recording.');
+      }
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const options = { mimeType: 'audio/webm' };
+        mediaRecorder = new MediaRecorder(mediaStream, options);
+        recordingFilename = `recording_${Date.now()}.webm`;
+        mediaRecorder.addEventListener('dataavailable', async (ev) => {
+          if (ev.data && ev.data.size > 0) {
+            // upload chunk (not final)
+            await uploadChunk(ev.data, false);
+          }
+        });
+        mediaRecorder.addEventListener('stop', async () => {
+          // request finalization by sending a zero-length final chunk headerless, or send last blob with final=true
+          // some browsers will have already provided last chunk via dataavailable; ensure server finalizes
+          await uploadChunk(new Blob([]), true);
+          recordStatus.textContent = 'Not recording';
+          stopRecordBtn.disabled = true;
+          startRecordBtn.disabled = false;
+          if (mediaStream) {
+            mediaStream.getTracks().forEach(t => t.stop());
+            mediaStream = null;
+          }
+        });
+        // start and ask for periodic chunks every 3s
+        mediaRecorder.start(3000);
+        recordStatus.textContent = 'Recording…';
+        startRecordBtn.disabled = true;
+        stopRecordBtn.disabled = false;
+      } catch (err) {
+        show(detailStatus, err.message || String(err));
+      }
+    });
+
+    stopRecordBtn.addEventListener('click', () => {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
       }
     });
   </script>

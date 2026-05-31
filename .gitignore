@@ -23,4 +23,5 @@ render-data/
 
 #currently empty, but may be used in the future for other files that should be ignored
 docs/
+
 mobile_app/

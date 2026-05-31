@@ -48,13 +48,16 @@
 
     async function postJson(url,data){ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data||{})}); const t=await r.text(); try{return JSON.parse(t);}catch(e){return {error:t||'Invalid response'}} }
 
+    function ensureWebAuthnHost(){ const host=window.location.hostname; if(host==='127.0.0.1' || host==='0.0.0.0' || host==='::1'){ const normalized=`${window.location.protocol}//localhost${window.location.port?`:${window.location.port}`:''}${window.location.pathname}${window.location.search}${window.location.hash}`; window.location.replace(normalized); return false; } return true; }
+
     document.getElementById('registerPasskeyBtn').addEventListener('click', async function(){
       const msg = document.getElementById('webauthnMsg'); show(msg,'Preparing...');
+      if(!ensureWebAuthnHost()){ show(msg,'Redirecting to localhost for biometric compatibility...'); return; }
       if(!window.navigator.credentials || !navigator.credentials.create){ show(msg,'WebAuthn not available in this browser.'); return; }
       const opts = await postJson('/api/account/webauthn/register/options');
       if(opts.error){ show(msg,opts.error||'Failed to get options'); return; }
       // normalize binary fields
-      function b64uToBuf(s){ const base64=s.replace(/-/g,'+').replace(/_/g,'/'); const pad='='.repeat((4-(base64.length%4))%4); const bin=atob(base64+pad); const a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i); return a; }
+      function b64uToBuf(s){ if(s instanceof ArrayBuffer){ return new Uint8Array(s); } if(ArrayBuffer.isView(s)){ return new Uint8Array(s.buffer, s.byteOffset, s.byteLength); } if(typeof s!=='string'){ throw new Error('Invalid binary input format.'); } const base64=s.replace(/-/g,'+').replace(/_/g,'/'); const pad='='.repeat((4-(base64.length%4))%4); const bin=atob(base64+pad); const a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i); return a; }
       opts.challenge = b64uToBuf(opts.challenge);
       opts.user.id = b64uToBuf(opts.user.id);
       if(Array.isArray(opts.excludeCredentials)) opts.excludeCredentials = opts.excludeCredentials.map(c=>({ ...c, id: b64uToBuf(c.id) }));
