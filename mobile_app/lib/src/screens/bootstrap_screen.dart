@@ -21,17 +21,20 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
   }
 
   Future<void> _bootstrap() async {
-    try {
-      await AppSession.instance.initialize();
-      final account = await AppSession.instance.client.accountInfo();
-      if (!mounted) {
-        return;
+    // Start initialization in the background so opening the encrypted
+    // database doesn't block the first frame. If initialization completes
+    // and an account is available we'll navigate to the dashboard.
+    AppSession.instance.initialize().then((_) async {
+      try {
+        final account = await AppSession.instance.client.accountInfo();
+        if (!mounted) return;
+        Navigator.of(context).pushReplacementNamed('/dashboard', arguments: account);
+      } catch (_) {
+        // Not signed in or backend unreachable — let the UI remain on the
+        // welcome screen so the user can sign in or change settings.
       }
-      Navigator.of(context).pushReplacementNamed('/dashboard', arguments: account);
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
+    }).catchError((error) {
+      if (!mounted) return;
       setState(() {
         _initializing = false;
         final message = error.toString();
@@ -39,7 +42,14 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
             ? null
             : 'Backend is not reachable at ${AppSession.instance.baseUrl}. Open Settings to check the URL, then retry.';
       });
-    }
+    });
+
+    // Allow UI to render immediately while initialization continues.
+    if (!mounted) return;
+    setState(() {
+      _initializing = false;
+      _status = null;
+    });
   }
 
   @override
