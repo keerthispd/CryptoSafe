@@ -1,15 +1,11 @@
-import os
-import sqlite3
-from pathlib import Path
+from web_app.app import DB_PATH, db_connection
 
-DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / 'cryptosafe.db'
-DB_PATH = Path(os.environ.get('DATABASE_PATH', str(DEFAULT_DB_PATH)))
 print('Using DB:', DB_PATH)
 if not DB_PATH.exists():
     print('Database file not found.')
     raise SystemExit(1)
 
-conn = sqlite3.connect(DB_PATH)
+conn = db_connection()
 cur = conn.cursor()
 
 print('Deleting from user_files...')

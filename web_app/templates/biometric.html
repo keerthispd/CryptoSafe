@@ -202,6 +202,15 @@
 
   <script>
     function base64urlToBuffer(value) {
+      if (value instanceof ArrayBuffer) {
+        return new Uint8Array(value);
+      }
+      if (ArrayBuffer.isView(value)) {
+        return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+      }
+      if (typeof value !== "string") {
+        throw new Error("Invalid binary input format.");
+      }
       const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
       const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
       const binary = atob(padded);
@@ -224,6 +233,16 @@
     function showError(message) {
       status.textContent = message;
       status.className = "status show error";
+    }
+
+    function ensureWebAuthnHost() {
+      const host = window.location.hostname;
+      if (host === "127.0.0.1" || host === "0.0.0.0" || host === "::1") {
+        const normalized = `${window.location.protocol}//localhost${window.location.port ? `:${window.location.port}` : ""}${window.location.pathname}${window.location.search}${window.location.hash}`;
+        window.location.replace(normalized);
+        return false;
+      }
+      return true;
     }
 
     async function beginBiometricVerification(options) {
@@ -289,6 +308,9 @@
 
     // On load, check options to determine available methods
     async function init() {
+      if (!ensureWebAuthnHost()) {
+        return;
+      }
       try {
         const resp = await fetch('/api/biometric/auth/options', { method: 'POST' });
         const info = await resp.json();

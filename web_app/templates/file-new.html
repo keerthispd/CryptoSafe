@@ -109,6 +109,159 @@
       flex-wrap: wrap;
     }
 
+    .voice-card {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(166, 180, 194, 0.1);
+    }
+
+    .voice-card-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 14px;
+    }
+
+    .voice-card-title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 800;
+    }
+
+    .voice-card-copy {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .voice-state {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 11px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--ink);
+      border: 1px solid rgba(166, 180, 194, 0.1);
+      font-size: 0.88rem;
+      white-space: nowrap;
+    }
+
+    .voice-state-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: var(--muted);
+      box-shadow: 0 0 0 0 rgba(110, 231, 183, 0.35);
+    }
+
+    .voice-state.recording {
+      background: rgba(244, 63, 94, 0.1);
+      border-color: rgba(244, 63, 94, 0.18);
+      color: #ffdce3;
+    }
+
+    .voice-state.recording .voice-state-dot {
+      background: #fb7185;
+      animation: voicePulse 1.25s infinite;
+    }
+
+    @keyframes voicePulse {
+      0% { box-shadow: 0 0 0 0 rgba(251, 113, 133, 0.45); }
+      70% { box-shadow: 0 0 0 12px rgba(251, 113, 133, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(251, 113, 133, 0); }
+    }
+
+    .voice-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid rgba(166, 180, 194, 0.12);
+      border-radius: 999px;
+      padding: 11px 14px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--ink);
+      cursor: pointer;
+      font: inherit;
+      font-weight: 700;
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .icon-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      border-color: rgba(110, 231, 183, 0.18);
+    }
+
+    .icon-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .icon-btn.primary {
+      background: rgba(255, 255, 255, 0.055);
+      color: var(--ink);
+      border-color: rgba(166, 180, 194, 0.12);
+    }
+
+    .icon-btn.danger {
+      background: rgba(255, 255, 255, 0.05);
+      color: #ffd7df;
+      border-color: rgba(244, 63, 94, 0.16);
+    }
+
+    .icon-btn .icon {
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      flex: 0 0 auto;
+    }
+
+    .icon-btn.primary .icon,
+    .icon-btn.danger .icon {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .voice-preview {
+      display: none;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(166, 180, 194, 0.1);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    .voice-preview.show { display: block; }
+
+    .voice-preview strong {
+      display: block;
+      color: var(--ink);
+      margin-bottom: 2px;
+    }
+
+    .voice-preview small {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+    }
+
     button {
       border: 0;
       border-radius: 10px;
@@ -155,6 +308,39 @@
         <textarea id="content" name="content"></textarea>
       </div>
       <div class="field">
+        <label>Voice note</label>
+        <div class="voice-card">
+          <div class="voice-card-header">
+            <div>
+              <p class="voice-card-title">Record a voice note</p>
+              <p class="voice-card-copy">Capture audio here and submit it together with the file.</p>
+            </div>
+            <span id="voiceStatus" class="voice-state"><span class="voice-state-dot"></span><span>Ready</span></span>
+          </div>
+          <div class="voice-actions">
+            <button type="button" class="icon-btn primary" id="startRecordBtn">
+              <span class="icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3z"/><path d="M19 11a7 7 0 0 1-14 0"/><path d="M12 18v3"/></svg>
+              </span>
+              <span>Record</span>
+            </button>
+            <button type="button" class="icon-btn danger" id="stopRecordBtn" disabled>
+              <span class="icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+              </span>
+              <span>Stop</span>
+            </button>
+            <button type="button" class="icon-btn" id="clearRecordingBtn" disabled>
+              <span class="icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </span>
+              <span>Remove</span>
+            </button>
+          </div>
+          <div class="voice-preview" id="voicePreview">No voice note attached yet.</div>
+        </div>
+      </div>
+      <div class="field">
         <label for="upload_file">Attachments</label>
         <input id="upload_file" name="upload_file" type="file" multiple accept="image/*,audio/*,.pdf,.doc,.docx,.txt,.rtf,.csv,.xls,.xlsx,.ppt,.pptx,.mp3,.wav,.m4a,.ogg,.aac,.flac" />
       </div>
@@ -169,11 +355,131 @@
     const createForm = document.getElementById("createForm");
     const status = document.getElementById("status");
     const clearBtn = document.getElementById("clearBtn");
+    const voiceStatus = document.getElementById("voiceStatus");
+    const voicePreview = document.getElementById("voicePreview");
+    const startRecordBtn = document.getElementById("startRecordBtn");
+    const stopRecordBtn = document.getElementById("stopRecordBtn");
+    const clearRecordingBtn = document.getElementById("clearRecordingBtn");
+
+    let mediaRecorder = null;
+    let mediaStream = null;
+    let recordedChunks = [];
+    let recordedBlob = null;
+    let recordedFilename = "";
 
     function showStatus(message) {
       status.textContent = message;
       status.className = "status show error";
     }
+
+    function clearStatus() {
+      status.className = "status";
+      status.textContent = "";
+    }
+
+    function setVoiceState(message, isRecording = false) {
+      voiceStatus.className = isRecording ? "voice-state recording" : "voice-state";
+      voiceStatus.lastElementChild.textContent = message;
+    }
+
+    function setPreview(message, filename = "", size = 0, tone = "") {
+      if (!recordedBlob) {
+        voicePreview.className = "voice-preview";
+        voicePreview.textContent = message;
+        clearRecordingBtn.disabled = true;
+        return;
+      }
+
+      voicePreview.className = "voice-preview show";
+      voicePreview.innerHTML = `<strong>${filename || "Voice note"}</strong>${message}<small>${(size / 1024).toFixed(size < 1024 * 10 ? 1 : 0)} KB${tone ? ` | ${tone}` : ""}</small>`;
+      clearRecordingBtn.disabled = false;
+    }
+
+    function resetRecording() {
+      recordedChunks = [];
+      recordedBlob = null;
+      recordedFilename = "";
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((track) => track.stop());
+        mediaStream = null;
+      }
+      mediaRecorder = null;
+      stopRecordBtn.disabled = true;
+      startRecordBtn.disabled = false;
+      clearRecordingBtn.disabled = true;
+      setVoiceState("Ready", false);
+      voicePreview.className = "voice-preview";
+      voicePreview.textContent = "No voice note attached yet.";
+    }
+
+    function pickRecorderMimeType() {
+      if (window.MediaRecorder && typeof MediaRecorder.isTypeSupported === "function") {
+        const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/ogg"];
+        return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) || "";
+      }
+      return "";
+    }
+
+    function extensionForMime(mimeType) {
+      const lowered = String(mimeType || "").toLowerCase();
+      if (lowered.includes("ogg")) return "ogg";
+      if (lowered.includes("mpeg")) return "mp3";
+      return "webm";
+    }
+
+    clearRecordingBtn.addEventListener("click", () => {
+      resetRecording();
+    });
+
+    startRecordBtn.addEventListener("click", async () => {
+      clearStatus();
+      if (!window.MediaRecorder || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showStatus("This browser does not support audio recording.");
+        return;
+      }
+
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        recordedChunks = [];
+        const mimeType = pickRecorderMimeType();
+        mediaRecorder = mimeType ? new MediaRecorder(mediaStream, { mimeType }) : new MediaRecorder(mediaStream);
+        recordedFilename = `voice-note-${Date.now()}.${extensionForMime(mediaRecorder.mimeType || mimeType || "audio/webm")}`;
+        mediaRecorder.addEventListener("dataavailable", (event) => {
+          if (event.data && event.data.size > 0) {
+            recordedChunks.push(event.data);
+          }
+        });
+        mediaRecorder.addEventListener("stop", () => {
+          const mime = mediaRecorder?.mimeType || mimeType || "audio/webm";
+          recordedBlob = new Blob(recordedChunks, { type: mime });
+          setVoiceState("Recorded", false);
+          setPreview("Recorded audio is ready to be attached.", recordedFilename, recordedBlob.size, mime);
+          stopRecordBtn.disabled = true;
+          startRecordBtn.disabled = false;
+          if (mediaStream) {
+            mediaStream.getTracks().forEach((track) => track.stop());
+            mediaStream = null;
+          }
+        });
+
+        mediaRecorder.start();
+        startRecordBtn.disabled = true;
+        stopRecordBtn.disabled = false;
+        clearRecordingBtn.disabled = true;
+        setVoiceState("Recording", true);
+        voicePreview.className = "voice-preview";
+        voicePreview.textContent = "Recording in progress...";
+      } catch (error) {
+        resetRecording();
+        showStatus(error.message || String(error));
+      }
+    });
+
+    stopRecordBtn.addEventListener("click", () => {
+      if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+      }
+    });
 
     async function apiRequest(url, options = {}) {
       const isFormData = options.body instanceof FormData;
@@ -198,6 +504,9 @@
         formData.append("title", document.getElementById("title").value.trim());
         formData.append("description", document.getElementById("description").value.trim());
         formData.append("content", document.getElementById("content").value);
+        if (recordedBlob) {
+          formData.append("upload_file", recordedBlob, recordedFilename || `voice-note-${Date.now()}.webm`);
+        }
         Array.from(document.getElementById("upload_file").files || []).forEach((file) => {
           formData.append("upload_file", file);
         });
@@ -212,7 +521,10 @@
       createForm.reset();
       status.className = "status";
       status.textContent = "";
+      resetRecording();
     });
+
+    resetRecording();
   </script>
 </body>
 </html>

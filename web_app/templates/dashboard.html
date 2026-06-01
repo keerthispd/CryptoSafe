@@ -419,6 +419,7 @@
         <div class="account-user">Signed in: <span id="accountUserId">—</span></div>
       </div>
       <a class="logout" href="/logout">Logout</a>
+      <a id="dbViewBtn" class="logout hidden" href="#" title="Admin: open database view">DB View</a>
     </div>
   </header>
 
@@ -542,6 +543,46 @@
     loadFiles();
   </script>
   <script>
+    // Open database view in a new tab after prompting for admin token
+    // DB view modal handling
+    const dbViewBtn = document.getElementById('dbViewBtn');
+    const dbModal = (function(){
+      const wrap = document.createElement('div');
+      wrap.className = 'hidden modal-backdrop';
+      wrap.id = 'dbModal';
+      wrap.innerHTML = `
+      <div class="modal">
+        <h3>Open Database View</h3>
+        <p>Enter admin token to open the sanitized database view in a new tab.</p>
+        <div class="field">
+          <label for="dbToken">Admin token</label>
+          <input id="dbToken" type="text" placeholder="token..." />
+        </div>
+        <div class="btn-row">
+          <button type="button" id="dbCancel" class="alt">Cancel</button>
+          <button type="button" id="dbOpen" class="primary">Open</button>
+        </div>
+      </div>`;
+      document.body.appendChild(wrap);
+      const tokenInput = wrap.querySelector('#dbToken');
+      const cancel = wrap.querySelector('#dbCancel');
+      const openBtn = wrap.querySelector('#dbOpen');
+      function show(){ wrap.classList.remove('hidden'); wrap.setAttribute('aria-hidden','false'); setTimeout(()=>tokenInput.focus(),50); }
+      function hide(){ wrap.classList.add('hidden'); wrap.setAttribute('aria-hidden','true'); tokenInput.value=''; }
+      cancel.addEventListener('click', hide);
+      openBtn.addEventListener('click', ()=>{
+        const t = tokenInput.value.trim();
+        if (!t) return alert('Token required');
+        const url = '/database-view?token=' + encodeURIComponent(t);
+        window.open(url, '_blank');
+        hide();
+      });
+      return { show, hide };
+    })();
+
+    dbViewBtn.addEventListener('click', function(e){ e.preventDefault(); dbModal.show(); });
+  </script>
+  <script>
     // Account UI: fetch current userid and wire delete-account action
     (function(){
       const idEl = document.getElementById('accountUserId');
@@ -552,6 +593,11 @@
           if (!res.ok) return;
           const data = await res.json();
           if (data && data.userid) idEl.textContent = data.userid;
+          // show DB View only for admin users
+          try{
+            const btn = document.getElementById('dbViewBtn');
+            if (data && data.is_admin) btn.classList.remove('hidden'); else btn.classList.add('hidden');
+          }catch(e){}
         }catch(e){}
       }
 

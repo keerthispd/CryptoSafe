@@ -359,6 +359,15 @@
 
 	<script>
 		function base64urlToBuffer(value) {
+			if (value instanceof ArrayBuffer) {
+				return new Uint8Array(value);
+			}
+			if (ArrayBuffer.isView(value)) {
+				return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+			}
+			if (typeof value !== "string") {
+				throw new Error("Invalid binary input format.");
+			}
 			const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
 			const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
 			const binary = atob(padded);
@@ -376,6 +385,16 @@
 				binary += String.fromCharCode(b);
 			}
 			return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+		}
+
+		function ensureWebAuthnHost() {
+			const host = window.location.hostname;
+			if (host === "127.0.0.1" || host === "0.0.0.0" || host === "::1") {
+				const normalized = `${window.location.protocol}//localhost${window.location.port ? `:${window.location.port}` : ""}${window.location.pathname}${window.location.search}${window.location.hash}`;
+				window.location.replace(normalized);
+				return false;
+			}
+			return true;
 		}
 
 		function showInlineError(message) {
@@ -493,6 +512,11 @@
 
 			if (!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create)) {
 				showInlineError("This browser or device does not support biometric passkeys. Choose 'Set a numeric passcode' instead.");
+				return;
+			}
+
+			if (!ensureWebAuthnHost()) {
+				showInlineError("Redirecting to localhost for biometric compatibility...");
 				return;
 			}
 

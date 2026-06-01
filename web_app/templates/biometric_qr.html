@@ -20,14 +20,16 @@
   </div>
 
   <script>
-    function base64urlToArrayBuffer(value){const base64=value.replace(/-/g,'+').replace(/_/g,'/');const padded=base64+"=".repeat((4-(base64.length%4))%4);const binary=atob(padded);const bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)}
+    function base64urlToArrayBuffer(value){if(value instanceof ArrayBuffer){return value}if(ArrayBuffer.isView(value)){return value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength)}if(typeof value!=='string'){throw new Error('Invalid binary input format.')}const base64=value.replace(/-/g,'+').replace(/_/g,'/');const padded=base64+"=".repeat((4-(base64.length%4))%4);const binary=atob(padded);const bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)}
     function bufferToBase64url(input){const bytes=input instanceof Uint8Array?input:new Uint8Array(input);let binary='';for(const b of bytes)binary+=String.fromCharCode(b);return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,'')}
+    function ensureWebAuthnHost(){const host=window.location.hostname;if(host==='127.0.0.1' || host==='0.0.0.0' || host==='::1'){const normalized=`${window.location.protocol}//localhost${window.location.port?`:${window.location.port}`:''}${window.location.pathname}${window.location.search}${window.location.hash}`;window.location.replace(normalized);return false;}return true;}
 
     const statusEl=document.getElementById('status');
     const start=document.getElementById('start');
     const token = location.pathname.split('/').pop();
 
     start.addEventListener('click', async ()=>{
+      if(!ensureWebAuthnHost()){ statusEl.textContent='Redirecting to localhost for biometric compatibility...'; return; }
       statusEl.textContent='Preparing...';
       try{
         const optsRes=await fetch('/api/biometric/qr/'+encodeURIComponent(token)+'/options',{method:'POST'});

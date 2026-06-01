@@ -1,4 +1,6 @@
+# Python
 __pycache__/
+<<<<<<< HEAD
 
 .venv/
 venv/
@@ -16,3 +18,34 @@ mobile_app/
 
 render-data/
 
+=======
+*.pyc
+
+# Virtual environments
+venv/
+.venv/
+
+# Database
+cryptosafe.db
+data/
+cryptosafe.db-shm
+cryptosafe.db-wal
+sqlcipher_db.py
+
+# Environment variables
+.env
+
+#debug logs
+scripts/
+tools/
+adb_log.txt
+
+#deployment files
+render-data/
+
+#currently empty, but may be used in the future for other files that should be ignored
+docs/
+
+#currently in development
+mobile_app/
+>>>>>>> android-development
