@@ -1,24 +1,5 @@
 # Python
 __pycache__/
-<<<<<<< HEAD
-
-.venv/
-venv/
-
-web_app/cryptosafe.db
-web_app/cryptosafe.db-shm
-web_app/cryptosafe.db-wal
-
-render-data
-render-data/
-scripts/
-
-doc/
-mobile_app/
-
-render-data/
-
-=======
 *.pyc
 
 # Virtual environments
@@ -31,6 +12,9 @@ data/
 cryptosafe.db-shm
 cryptosafe.db-wal
 sqlcipher_db.py
+web_app/cryptosafe.db
+web_app/cryptosafe.db-shm
+web_app/cryptosafe.db-wal
 
 # Environment variables
 .env
@@ -48,4 +32,3 @@ docs/
 
 #currently in development
 mobile_app/
->>>>>>> android-development
