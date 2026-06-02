@@ -1737,37 +1737,58 @@
       }
     });
 
-    // Live audio recording via MediaRecorder (uploading chunks)
+    // Live audio recording via MediaRecorder.
     const startRecordBtn = document.getElementById('startRecordBtn');
     const stopRecordBtn = document.getElementById('stopRecordBtn');
     const recordStatus = document.getElementById('recordStatus');
     let mediaRecorder = null;
     let mediaStream = null;
+    let recordedChunks = [];
     let recordingFilename = '';
 
-    async function uploadChunk(blob, isFinal = false) {
+    function recordingExtension(mimeType) {
+      const lowered = String(mimeType || '').toLowerCase();
+      if (lowered.includes('ogg')) return 'ogg';
+      if (lowered.includes('mpeg')) return 'mp3';
+      if (lowered.includes('mp4')) return 'm4a';
+      return 'webm';
+    }
+
+    function pickRecorderMimeType() {
+      if (window.MediaRecorder && typeof MediaRecorder.isTypeSupported === 'function') {
+        const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg'];
+        return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) || '';
+      }
+      return '';
+    }
+
+    async function uploadRecording() {
       if (!fileId) return;
-      if (!currentPassword) return show(detailStatus, 'Unlock file before recording');
+      if (!currentPassword) {
+        show(detailStatus, 'Unlock file before recording');
+        return;
+      }
+      const mimeType = mediaRecorder?.mimeType || 'audio/webm';
+      const recordingBlob = new Blob(recordedChunks, { type: mimeType });
+      if (!recordingBlob.size) {
+        show(detailStatus, 'No audio was captured. Please try recording again.');
+        return;
+      }
       try {
         const fd = new FormData();
+        fd.append('title', title.value.trim());
+        fd.append('description', description.value.trim());
+        fd.append('content', content.value);
         fd.append('password', currentPassword);
-        fd.append('filename', recordingFilename || `recording_${Date.now()}.webm`);
-        fd.append('final', isFinal ? 'true' : 'false');
-        fd.append('chunk', blob, recordingFilename || `recording_${Date.now()}.webm`);
-        const resp = await fetch(`/api/files/${fileId}/upload_audio_chunk`, { method: 'POST', body: fd });
-        if (!resp.ok) {
-          const txt = await resp.text();
-          throw new Error(txt || 'Upload failed');
-        }
-        const j = await resp.json().catch(()=>({}));
-        if (isFinal) {
-          // refresh attachment list
-          try {
-            const refreshed = await apiRequest(`/api/files/${fileId}/display`, { method: 'POST', body: JSON.stringify({ password: currentPassword }) });
-            currentAttachments = refreshed.attachments || [];
-            renderAttachments();
-          } catch (e) {}
-        }
+        fd.append('upload_file', recordingBlob, recordingFilename || `recording_${Date.now()}.${recordingExtension(mimeType)}`);
+        await apiRequest(`/api/files/${fileId}/update`, { method: 'POST', body: fd });
+        const refreshed = await apiRequest(`/api/files/${fileId}/display`, {
+          method: 'POST',
+          body: JSON.stringify({ password: currentPassword }),
+        });
+        currentAttachments = refreshed.attachments || [];
+        renderAttachments();
+        show(detailStatus, '', 'ok');
       } catch (err) {
         show(detailStatus, err.message || String(err));
       }
@@ -1783,19 +1804,17 @@
       }
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const options = { mimeType: 'audio/webm' };
-        mediaRecorder = new MediaRecorder(mediaStream, options);
-        recordingFilename = `recording_${Date.now()}.webm`;
+        const mimeType = pickRecorderMimeType();
+        mediaRecorder = mimeType ? new MediaRecorder(mediaStream, { mimeType }) : new MediaRecorder(mediaStream);
+        recordedChunks = [];
+        recordingFilename = `recording_${Date.now()}.${recordingExtension(mediaRecorder.mimeType || mimeType)}`;
         mediaRecorder.addEventListener('dataavailable', async (ev) => {
           if (ev.data && ev.data.size > 0) {
-            // upload chunk (not final)
-            await uploadChunk(ev.data, false);
+            recordedChunks.push(ev.data);
           }
         });
         mediaRecorder.addEventListener('stop', async () => {
-          // request finalization by sending a zero-length final chunk headerless, or send last blob with final=true
-          // some browsers will have already provided last chunk via dataavailable; ensure server finalizes
-          await uploadChunk(new Blob([]), true);
+          await uploadRecording();
           setRecordingState('Ready', false);
           stopRecordBtn.disabled = true;
           startRecordBtn.disabled = false;
@@ -1804,8 +1823,7 @@
             mediaStream = null;
           }
         });
-        // start and ask for periodic chunks every 3s
-        mediaRecorder.start(3000);
+        mediaRecorder.start();
         setRecordingState('Recording', true);
         startRecordBtn.disabled = true;
         stopRecordBtn.disabled = false;

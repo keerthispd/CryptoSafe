@@ -38,6 +38,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"
 DB_PATH = Path(os.environ.get("DATABASE_PATH", str(BASE_DIR / "cryptosafe.db")))
+AUDIO_CHUNK_DIR = Path(os.environ.get("AUDIO_CHUNK_DIR", str(BASE_DIR / "audio_chunks")))
 LOCKOUT_DURATION = timedelta(hours=24)
 MAX_FAILED_ATTEMPTS = 3
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -63,6 +64,11 @@ ALLOWED_UPLOAD_EXTENSIONS = {
     "wav",
     "m4a",
     "ogg",
+    "oga",
+    "opus",
+    "webm",
+    "3gp",
+    "amr",
     "aac",
     "flac",
 }
@@ -83,7 +89,11 @@ ALLOWED_UPLOAD_MIME_TYPES = {
     "audio/wav",
     "audio/x-wav",
     "audio/mp4",
+    "audio/webm",
     "audio/ogg",
+    "audio/opus",
+    "audio/3gpp",
+    "audio/amr",
     "audio/aac",
     "audio/flac",
 }
@@ -412,18 +422,13 @@ def relying_party_id() -> str:
     return host
 
 
-'''def expected_origin() -> str:
-    origin = request.host_url.rstrip("/")
-    if "127.0.0.1" in origin:
-        origin = origin.replace("127.0.0.1", "localhost")
-    return origin'''
 def expected_origin() -> str:
-    scheme = request.headers.get(
-        "X-Forwarded-Proto",
-        request.scheme
-    )
+    scheme = request.scheme
+    host = request.host.strip().lower()
+    if host.startswith("127.0.0.1"):
+        host = host.replace("127.0.0.1", "localhost", 1)
 
-    return f"{scheme}://{relying_party_id()}"
+    return f"{scheme}://{host}"
 
 def uploaded_file_from_request(field_name: str = "upload_file"):
     uploaded = request.files.get(field_name)
@@ -2301,6 +2306,87 @@ def update_user_file(file_id: int):
         )
 
     return jsonify({"message": "File updated successfully."})
+
+
+@app.post("/api/files/<int:file_id>/upload_audio_chunk")
+def upload_user_file_audio_chunk(file_id: int):
+    auth_error = json_auth_required()
+    if auth_error:
+        return auth_error
+
+    userid = session_user()
+    password = request.form.get("password") or ""
+    filename = secure_filename(request.form.get("filename") or f"recording_{int(now_utc().timestamp())}.webm")
+    is_final = (request.form.get("final") or "").strip().lower() in {"1", "true", "yes", "on"}
+    chunk = request.files.get("chunk")
+
+    if not password:
+        return jsonify({"error": "Account password confirmation is required."}), 400
+    if not verify_user_password(userid, password):
+        return jsonify({"error": "Password confirmation failed."}), 403
+    if not filename:
+        return jsonify({"error": "Recording filename is invalid."}), 400
+    if chunk is None and not is_final:
+        return jsonify({"error": "Audio chunk is required."}), 400
+
+    with db_connection() as conn:
+        row = conn.execute(
+            "SELECT id FROM user_files WHERE id = ? AND userid = ?",
+            (file_id, userid),
+        ).fetchone()
+        if row is None:
+            return jsonify({"error": "File not found."}), 404
+
+    chunk_key = hashlib.sha256(f"{userid}:{file_id}:{filename}".encode("utf-8")).hexdigest()
+    AUDIO_CHUNK_DIR.mkdir(parents=True, exist_ok=True)
+    chunk_path = AUDIO_CHUNK_DIR / f"{chunk_key}.part"
+
+    if chunk is not None:
+        raw_chunk = chunk.read()
+        if raw_chunk:
+            with chunk_path.open("ab") as target:
+                target.write(raw_chunk)
+
+    if not is_final:
+        return jsonify({"message": "Audio chunk received."})
+
+    if not chunk_path.exists() or chunk_path.stat().st_size == 0:
+        return jsonify({"error": "No recorded audio was received."}), 400
+
+    raw_audio = chunk_path.read_bytes()
+    mime_type = infer_mime_type(filename, chunk.mimetype if chunk is not None else "")
+    if filename.lower().endswith(".webm") and mime_type in {"application/octet-stream", "video/webm"}:
+        mime_type = "audio/webm"
+    validation_error = validate_uploaded_file(filename, mime_type, len(raw_audio))
+    if validation_error:
+        try:
+            chunk_path.unlink()
+        except OSError:
+            pass
+        return jsonify({"error": validation_error}), 400
+
+    now_value = now_utc().isoformat()
+    upload_data = {
+        "name": filename,
+        "mime": mime_type,
+        "size": len(raw_audio),
+        "encrypted": encrypt_bytes(raw_audio),
+    }
+
+    with db_connection() as conn:
+        save_file_attachments(conn, file_id, userid, [upload_data], now_value, replace_existing=False)
+        sync_legacy_file_attachment_columns(conn, file_id, userid)
+        conn.execute(
+            "UPDATE user_files SET updated_at = ? WHERE id = ? AND userid = ?",
+            (now_value, file_id, userid),
+        )
+
+    try:
+        chunk_path.unlink()
+    except OSError:
+        pass
+
+    return jsonify({"message": "Voice recording uploaded successfully."})
 
 
 @app.post("/api/files/<int:file_id>/delete")
