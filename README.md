@@ -5,7 +5,7 @@ CryptoSafe is a secure data storage platform designed to protect sensitive perso
 The project provides:
 
 - A Web Application built using Flask
-- An Android Application built using Flutter
+- An Android Application built using Flutter (currently under developement)
 - Multi-factor authentication
 - Biometric authentication using WebAuthn Passkeys
 - Secure encryption for stored data
